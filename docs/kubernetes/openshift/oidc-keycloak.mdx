@@ -1,179 +1,21 @@
 ---
 # SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-title: "OIDC with Keycloak"
-sidebar-title: "OIDC with Keycloak"
+title: "OIDC on OpenShift"
+sidebar-title: "OIDC on OpenShift"
 slug: "kubernetes/openshift/oidc-keycloak"
-description: "Configure Keycloak as the OIDC provider for OpenShell on OpenShift, including the required protocol mappers and Helm values."
+description: "Connect the OpenShell CLI to a Keycloak-authenticated gateway on OpenShift."
 keywords: "Generative AI, Cybersecurity, Kubernetes, OpenShift, OIDC, Keycloak, Authentication, JWT"
 position: 3
 ---
 
-The generic [Access Control](/kubernetes/access-control) guide covers OIDC configuration for any provider. This page covers Keycloak-specific setup on OpenShift, including the protocol mappers required for the gateway to validate access tokens.
+This page covers the OpenShift-specific steps for connecting the CLI to a Keycloak-authenticated gateway. For the full Keycloak setup (realm, client, protocol mappers, roles), refer to the [Keycloak setup](/kubernetes/access-control#keycloak-setup) section of the Access Control guide.
 
 ## Prerequisites
 
 - OpenShell [installed on OpenShift](/kubernetes/openshift/install) with TLS enabled
-- Keycloak instance accessible from the cluster
-- Admin access to Keycloak
-
-## Create the realm and client
-
-Create a dedicated `openshell` realm and a public OIDC client for the CLI.
-
-<Note>
-The `kcadm.sh` examples below use `KC_POD` and `KC_ADM` variables defined in the first code block. Set them once in your shell and reuse them for all subsequent commands. The `--config /tmp/kcadm.config` flag is required because the Keycloak container runs as non-root and cannot write to the default config path.
-</Note>
-
-<Tabs>
-<Tab title="kcadm.sh">
-
-```shell
-KC_POD="oc exec keycloak-0 -n keycloak --"
-KC_ADM="/opt/keycloak/bin/kcadm.sh --config /tmp/kcadm.config"
-
-$KC_POD $KC_ADM config credentials \
-  --server http://localhost:8080 \
-  --realm master \
-  --user <admin-user> \
-  --password <admin-password>
-
-$KC_POD $KC_ADM create realms \
-  -s realm=openshell \
-  -s enabled=true
-
-$KC_POD $KC_ADM create clients -r openshell \
-  -s clientId=openshell-cli \
-  -s enabled=true \
-  -s publicClient=true \
-  -s directAccessGrantsEnabled=true \
-  -s standardFlowEnabled=true \
-  -s 'redirectUris=["http://localhost:*","http://127.0.0.1:*"]' \
-  -s 'webOrigins=["http://localhost","http://127.0.0.1"]' \
-  -s 'attributes={"pkce.code.challenge.method":"S256"}'
-```
-
-</Tab>
-<Tab title="REST API">
-
-```shell
-KC_URL=https://keycloak.example.com
-
-TOKEN=$(curl -sk "${KC_URL}/realms/master/protocol/openid-connect/token" \
-  -d "client_id=admin-cli" \
-  -d "username=<admin-user>" \
-  -d "password=<admin-password>" \
-  -d "grant_type=password" | jq -r .access_token)
-
-curl -sk -X POST "${KC_URL}/admin/realms" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"realm":"openshell","enabled":true}'
-
-curl -sk -X POST "${KC_URL}/admin/realms/openshell/clients" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "clientId": "openshell-cli",
-    "enabled": true,
-    "publicClient": true,
-    "directAccessGrantsEnabled": true,
-    "standardFlowEnabled": true,
-    "redirectUris": ["http://localhost:*", "http://127.0.0.1:*"],
-    "webOrigins": ["http://localhost", "http://127.0.0.1"],
-    "attributes": {"pkce.code.challenge.method": "S256"}
-  }'
-```
-
-</Tab>
-</Tabs>
-
-## Add required protocol mappers
-
-Keycloak does not include `sub`, `aud`, or realm roles in access tokens for public clients by default. Without these claims, the gateway rejects tokens with errors like `missing field 'sub'`, audience mismatch, or `role 'openshell-user' required`.
-
-Add three protocol mappers to the `openshell-cli` client:
-
-| Mapper name | Mapper type | Key config |
-|---|---|---|
-| `sub` | Subject (sub) | access.token.claim: true |
-| `openshell-audience` | Audience | included.client.audience: `openshell-cli` |
-| `realm-roles` | User Realm Role | claim.name: `realm_access.roles`, multivalued: true |
-
-Add these via the Keycloak admin console under **Clients → openshell-cli → Client scopes → Dedicated scope → Add mapper**, or via the CLI/API:
-
-<Tabs>
-<Tab title="kcadm.sh">
-
-```shell
-CLIENT_UUID=$($KC_POD $KC_ADM get clients -r openshell \
-  -q clientId=openshell-cli --fields id --format csv --noquotes)
-
-$KC_POD $KC_ADM create clients/$CLIENT_UUID/protocol-mappers/models -r openshell \
-  -s name=sub \
-  -s protocol=openid-connect \
-  -s protocolMapper=oidc-sub-mapper \
-  -s 'config={"access.token.claim":"true","id.token.claim":"true"}'
-
-$KC_POD $KC_ADM create clients/$CLIENT_UUID/protocol-mappers/models -r openshell \
-  -s name=openshell-audience \
-  -s protocol=openid-connect \
-  -s protocolMapper=oidc-audience-mapper \
-  -s 'config={"included.client.audience":"openshell-cli","access.token.claim":"true","id.token.claim":"true"}'
-
-$KC_POD $KC_ADM create clients/$CLIENT_UUID/protocol-mappers/models -r openshell \
-  -s name=realm-roles \
-  -s protocol=openid-connect \
-  -s protocolMapper=oidc-usermodel-realm-role-mapper \
-  -s 'config={"claim.name":"realm_access.roles","jsonType.label":"String","multivalued":"true","access.token.claim":"true","id.token.claim":"true","userinfo.token.claim":"true"}'
-```
-
-</Tab>
-<Tab title="REST API">
-
-```shell
-CLIENT_UUID=$(curl -sk "${KC_URL}/admin/realms/openshell/clients?clientId=openshell-cli" \
-  -H "Authorization: Bearer $TOKEN" | jq -r '.[0].id')
-
-for MAPPER in \
-  '{"name":"sub","protocol":"openid-connect","protocolMapper":"oidc-sub-mapper","config":{"access.token.claim":"true","id.token.claim":"true"}}' \
-  '{"name":"openshell-audience","protocol":"openid-connect","protocolMapper":"oidc-audience-mapper","config":{"included.client.audience":"openshell-cli","access.token.claim":"true","id.token.claim":"true"}}' \
-  '{"name":"realm-roles","protocol":"openid-connect","protocolMapper":"oidc-usermodel-realm-role-mapper","config":{"claim.name":"realm_access.roles","jsonType.label":"String","multivalued":"true","access.token.claim":"true","id.token.claim":"true","userinfo.token.claim":"true"}}'; do
-  curl -sk -X POST "${KC_URL}/admin/realms/openshell/clients/${CLIENT_UUID}/protocol-mappers/models" \
-    -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "$MAPPER"
-done
-```
-
-</Tab>
-</Tabs>
-
-## Create realm roles
-
-<Tabs>
-<Tab title="kcadm.sh">
-
-```shell
-$KC_POD $KC_ADM create roles -r openshell -s name=openshell-user
-$KC_POD $KC_ADM create roles -r openshell -s name=openshell-admin
-```
-
-</Tab>
-<Tab title="REST API">
-
-```shell
-curl -sk -X POST "${KC_URL}/admin/realms/openshell/roles" \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"name":"openshell-user"}'
-
-curl -sk -X POST "${KC_URL}/admin/realms/openshell/roles" \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"name":"openshell-admin"}'
-```
-
-</Tab>
-</Tabs>
-
-Assign `openshell-user` to users who need sandbox access and `openshell-admin` to administrators through the Keycloak admin console or API.
+- Gateway [exposed externally](/kubernetes/openshift/gateway-connection)
+- Keycloak realm and client configured per the [Keycloak setup](/kubernetes/access-control#keycloak-setup) guide
 
 ## Configure the gateway
 
