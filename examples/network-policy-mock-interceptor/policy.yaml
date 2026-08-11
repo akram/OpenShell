@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Organisation-mandated network policy injected into every sandbox.
+# The interceptor patches CreateSandbox requests to include this policy
+# and rejects UpdateConfig attempts that add endpoints outside this list.
+
+network_policies:
+  company_api:
+    name: company-api
+    endpoints:
+      - host: api.company.com
+        port: 443
+        protocol: rest
+        access: read-write
+        enforcement: enforce
+      - host: auth.company.com
+        port: 443
+        protocol: rest
+        access: read-only
+        enforcement: enforce
+    binaries:
+      - path: /usr/bin/curl
+      - path: /usr/bin/python3
+      - path: /usr/bin/wget
