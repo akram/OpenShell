@@ -3805,6 +3805,7 @@ fn driver_sandbox_spec_from_public(
         command: spec.command.clone(),
         tty: spec.tty,
         await_main_process_attachment: false,
+        default_command: spec.default_command,
     })
 }
 

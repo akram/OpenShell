@@ -71,7 +71,10 @@ impl MainProcessConfig {
                 command: spec.command.clone(),
                 tty: spec.tty,
                 await_main_process_attachment: spec.await_main_process_attachment,
-                default_command: false,
+                // Propagate the gateway's provenance: a gateway-substituted
+                // default carries `default_command = true` even though the
+                // command is non-empty, so the supervisor may remap its shell.
+                default_command: spec.default_command,
             },
             None | Some(_) => Self::scratch(),
         }
@@ -309,6 +312,17 @@ mod tests {
         assert!(!config.default_command);
         let decoded = MainProcessConfig::decode(&serde_json::to_string(&config).unwrap()).unwrap();
         assert!(!decoded.default_command);
+
+        // A gateway-substituted default carries the flag even though the command
+        // is non-empty; from_driver_spec must propagate it so the supervisor can
+        // remap the shell for images without bash.
+        let gateway_default = crate::proto::compute::v1::DriverSandboxSpec {
+            command: vec!["/bin/bash".into(), "-l".into()],
+            tty: true,
+            default_command: true,
+            ..Default::default()
+        };
+        assert!(MainProcessConfig::from_driver_spec(Some(&gateway_default)).default_command);
 
         // A legacy spec without the field decodes as not-default (safe: no
         // surprising rewrite of an unknown command).

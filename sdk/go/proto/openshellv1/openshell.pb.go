@@ -1242,9 +1242,14 @@ type SandboxSpec struct {
 	// portable scratch login shell before persistence.
 	Command []string `protobuf:"bytes,12,rep,name=command,proto3" json:"command,omitempty"`
 	// Allocate a retained pseudo-terminal for the main process.
-	Tty           bool `protobuf:"varint,13,opt,name=tty,proto3" json:"tty,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Tty bool `protobuf:"varint,13,opt,name=tty,proto3" json:"tty,omitempty"`
+	// True when `command` is the built-in default the gateway substituted for an
+	// omitted command, rather than a caller-supplied command. The supervisor may
+	// remap the default login shell to one present in the sandbox image (e.g.
+	// /bin/sh on Alpine); a caller-supplied command is never rewritten.
+	DefaultCommand bool `protobuf:"varint,14,opt,name=default_command,json=defaultCommand,proto3" json:"default_command,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *SandboxSpec) Reset() {
@@ -1329,6 +1334,13 @@ func (x *SandboxSpec) GetCommand() []string {
 func (x *SandboxSpec) GetTty() bool {
 	if x != nil {
 		return x.Tty
+	}
+	return false
+}
+
+func (x *SandboxSpec) GetDefaultCommand() bool {
+	if x != nil {
+		return x.DefaultCommand
 	}
 	return false
 }
@@ -14909,7 +14921,7 @@ const file_openshell_proto_rawDesc = "" +
 	"\bmetadata\x18\x01 \x01(\v2\".openshell.datamodel.v1.ObjectMetaR\bmetadata\x12-\n" +
 	"\x04spec\x18\x02 \x01(\v2\x19.openshell.v1.SandboxSpecR\x04spec\x123\n" +
 	"\x06status\x18\x03 \x01(\v2\x1b.openshell.v1.SandboxStatusR\x06status\x12t\n" +
-	"\x1ecreated_from_workload_template\x18\x14 \x01(\v2/.openshell.v1.SandboxWorkloadTemplateProvenanceR\x1bcreatedFromWorkloadTemplateJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\x05phaseR\x16current_policy_version\"\x83\x04\n" +
+	"\x1ecreated_from_workload_template\x18\x14 \x01(\v2/.openshell.v1.SandboxWorkloadTemplateProvenanceR\x1bcreatedFromWorkloadTemplateJ\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\x05phaseR\x16current_policy_version\"\xac\x04\n" +
 	"\vSandboxSpec\x12\x1b\n" +
 	"\tlog_level\x18\x01 \x01(\tR\blogLevel\x12L\n" +
 	"\venvironment\x18\x05 \x03(\v2*.openshell.v1.SandboxSpec.EnvironmentEntryR\venvironment\x129\n" +
@@ -14918,7 +14930,8 @@ const file_openshell_proto_rawDesc = "" +
 	"\tproviders\x18\b \x03(\tR\tproviders\x12W\n" +
 	"\x15resource_requirements\x18\t \x01(\v2\".openshell.v1.ResourceRequirementsR\x14resourceRequirements\x12\x18\n" +
 	"\acommand\x18\f \x03(\tR\acommand\x12\x10\n" +
-	"\x03tty\x18\r \x01(\bR\x03tty\x1a>\n" +
+	"\x03tty\x18\r \x01(\bR\x03tty\x12'\n" +
+	"\x0fdefault_command\x18\x0e \x01(\bR\x0edefaultCommand\x1a>\n" +
 	"\x10EnvironmentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\n" +

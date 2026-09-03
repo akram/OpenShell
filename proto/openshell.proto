@@ -890,6 +890,11 @@ message SandboxSpec {
   repeated string command = 12;
   // Allocate a retained pseudo-terminal for the main process.
   bool tty = 13;
+  // True when `command` is the built-in default the gateway substituted for an
+  // omitted command, rather than a caller-supplied command. The supervisor may
+  // remap the default login shell to one present in the sandbox image (e.g.
+  // /bin/sh on Alpine); a caller-supplied command is never rewritten.
+  bool default_command = 14;
 }
 
 message ResourceRequirements {

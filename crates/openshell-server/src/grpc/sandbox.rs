@@ -303,6 +303,11 @@ async fn handle_create_sandbox_inner(
     if spec.command.is_empty() {
         spec.command = vec!["/bin/bash".to_string(), "-l".to_string()];
         spec.tty = true;
+        // Mark this as the built-in default so the supervisor may remap the
+        // login shell to one present in the sandbox image (e.g. /bin/sh on
+        // Alpine). A caller-supplied command leaves this false and is never
+        // rewritten.
+        spec.default_command = true;
     }
 
     // Validate field sizes before any create-side effects.
