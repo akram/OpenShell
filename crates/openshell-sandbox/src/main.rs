@@ -667,16 +667,14 @@ fn main() -> Result<()> {
             } else if let Ok(json) = std::env::var(openshell_core::sandbox_env::MAIN_PROCESS_SPEC) {
                 let config = openshell_core::sandbox_env::MainProcessConfig::decode(&json)
                     .map_err(|error| miette::miette!("{error}"))?;
-                // The driver bakes the built-in default (`scratch`) into the spec
-                // when the user supplies no command. Detect that case so the
-                // default shell can be resolved against the sandbox image below.
-                let is_default =
-                    config == openshell_core::sandbox_env::MainProcessConfig::scratch();
+                // `default_command` is set by the driver only when it baked the
+                // built-in default (the user supplied no command); an explicit
+                // command carries `false` and is never remapped below.
                 (
                     config.command,
                     config.tty,
                     config.await_main_process_attachment,
-                    is_default,
+                    config.default_command,
                 )
             } else {
                 let config = openshell_core::sandbox_env::MainProcessConfig::scratch();
@@ -684,7 +682,7 @@ fn main() -> Result<()> {
                     config.command,
                     config.tty,
                     config.await_main_process_attachment,
-                    true,
+                    config.default_command,
                 )
             };
 

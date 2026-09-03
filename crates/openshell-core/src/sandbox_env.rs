@@ -42,6 +42,11 @@ pub struct MainProcessConfig {
     pub tty: bool,
     #[serde(default)]
     pub await_main_process_attachment: bool,
+    /// True when `command` is the built-in default rather than a user- or
+    /// driver-supplied command. Only the default is eligible for shell
+    /// remapping in the supervisor; an explicit command is never rewritten.
+    #[serde(default)]
+    pub default_command: bool,
 }
 
 impl MainProcessConfig {
@@ -54,6 +59,7 @@ impl MainProcessConfig {
             command: vec!["/bin/bash".to_string(), "-l".to_string()],
             tty: true,
             await_main_process_attachment: false,
+            default_command: true,
         }
     }
 
@@ -65,6 +71,7 @@ impl MainProcessConfig {
                 command: spec.command.clone(),
                 tty: spec.tty,
                 await_main_process_attachment: spec.await_main_process_attachment,
+                default_command: false,
             },
             None | Some(_) => Self::scratch(),
         }
@@ -282,5 +289,31 @@ mod tests {
         assert_eq!(config, MainProcessConfig::scratch());
         let encoded = serde_json::to_string(&config).unwrap();
         assert_eq!(MainProcessConfig::decode(&encoded).unwrap(), config);
+    }
+
+    #[test]
+    fn default_command_flag_distinguishes_default_from_explicit() {
+        // No user command → built-in default; eligible for shell remapping.
+        let empty = crate::proto::compute::v1::DriverSandboxSpec::default();
+        assert!(MainProcessConfig::from_driver_spec(Some(&empty)).default_command);
+        assert!(MainProcessConfig::from_driver_spec(None).default_command);
+
+        // Explicit command that happens to match the default shape must NOT be
+        // treated as the default, so it is never rewritten in the supervisor.
+        let explicit = crate::proto::compute::v1::DriverSandboxSpec {
+            command: vec!["/bin/bash".into(), "-l".into()],
+            tty: true,
+            ..Default::default()
+        };
+        let config = MainProcessConfig::from_driver_spec(Some(&explicit));
+        assert!(!config.default_command);
+        let decoded = MainProcessConfig::decode(&serde_json::to_string(&config).unwrap()).unwrap();
+        assert!(!decoded.default_command);
+
+        // A legacy spec without the field decodes as not-default (safe: no
+        // surprising rewrite of an unknown command).
+        let legacy =
+            MainProcessConfig::decode(r#"{"version":1,"command":["/x"],"tty":false}"#).unwrap();
+        assert!(!legacy.default_command);
     }
 }
