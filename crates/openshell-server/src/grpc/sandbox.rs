@@ -297,11 +297,13 @@ async fn handle_create_sandbox_inner(
         (resolved, Some(provenance))
     };
 
-    // Every newly persisted sandbox has one explicit canonical process. This
-    // portable default also preserves compatibility with callers compiled
-    // before the main-process field was introduced.
+    // An omitted command is resolved to the default login shell later, when the
+    // public spec is translated to the driver spec (driver_sandbox_spec_from_public).
+    // Deferring it keeps the "this was the default" provenance so the supervisor
+    // can remap the shell to one present in the sandbox image (e.g. /bin/sh on
+    // Alpine); persisting a concrete shell here would erase that signal. The
+    // default is a login shell, so request a TTY.
     if spec.command.is_empty() {
-        spec.command = vec!["/bin/bash".to_string(), "-l".to_string()];
         spec.tty = true;
     }
 

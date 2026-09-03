@@ -3802,9 +3802,18 @@ fn driver_sandbox_spec_from_public(
             }
         }),
         sandbox_token: String::new(),
-        command: spec.command.clone(),
+        // Resolve an omitted command to the portable default login shell here,
+        // flagging it as the default so the supervisor may remap the shell to
+        // one present in the sandbox image (e.g. /bin/sh on Alpine). A
+        // caller-supplied command is forwarded verbatim and never rewritten.
+        command: if spec.command.is_empty() {
+            vec!["/bin/bash".to_string(), "-l".to_string()]
+        } else {
+            spec.command.clone()
+        },
         tty: spec.tty,
         await_main_process_attachment: false,
+        default_command: spec.command.is_empty(),
     })
 }
 

@@ -182,6 +182,12 @@ message DriverSandboxSpec {
   // One-shot launch hint forwarded by the gateway when the creating client
   // will attach to the canonical main process.
   bool await_main_process_attachment = 14;
+  // True when `command` is the gateway-substituted default rather than a
+  // caller-supplied command. Lets the supervisor remap the default login shell
+  // to one present in the sandbox image (e.g. /bin/sh on Alpine); a
+  // caller-supplied command is never rewritten. Driver-internal: this contract
+  // is not part of the public OpenShell API.
+  bool default_command = 15;
 }
 
 message ResourceRequirements {
