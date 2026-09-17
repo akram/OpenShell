@@ -2016,7 +2016,13 @@ impl KubernetesComputeDriver {
             || security
                 .seccomp_profile
                 .as_ref()
-                .is_none_or(|profile| profile.type_ != "RuntimeDefault")
+                .is_none_or(|profile| {
+                    // Unconfined is accepted for the capability-free workload
+                    // container: the sandbox installs its own seccomp USER_NOTIF
+                    // filter (which needs a nested user namespace RuntimeDefault
+                    // would block) as the real enforcement boundary.
+                    profile.type_ != "RuntimeDefault" && profile.type_ != "Unconfined"
+                })
         {
             return Err(fail("numeric identity, groups, or seccomp profile changed"));
         }
@@ -5238,6 +5244,19 @@ fn apply_supervisor_sandbox_runtime_boundary(
             ]
         }),
     );
+    // The capability-free sandbox installs its own seccomp USER_NOTIF filter as
+    // the enforcement boundary. To obtain the CAP_SYS_ADMIN that
+    // SECCOMP_FILTER_FLAG_NEW_LISTENER requires without holding any container
+    // capability, it unshares a nested user namespace — which the RuntimeDefault
+    // profile blocks (unshare(CLONE_NEWUSER) is denied). When pod user
+    // namespaces are enabled we therefore run the workload container Unconfined;
+    // this is safe because the sandbox's own USER_NOTIF filter mediates the
+    // workload's syscalls. Without user namespaces we keep RuntimeDefault.
+    let seccomp_profile_type = if params.enable_user_namespaces {
+        "Unconfined"
+    } else {
+        "RuntimeDefault"
+    };
     spec.insert(
         "securityContext".to_string(),
         serde_json::json!({
@@ -5248,7 +5267,7 @@ fn apply_supervisor_sandbox_runtime_boundary(
             "fsGroupChangePolicy": "OnRootMismatch",
             "supplementalGroups": [],
             "supplementalGroupsPolicy": "Strict",
-            "seccompProfile": {"type": "RuntimeDefault"},
+            "seccompProfile": {"type": seccomp_profile_type},
             "sysctls": [{"name": "net.ipv4.ip_unprivileged_port_start", "value": "0"}]
         }),
     );
