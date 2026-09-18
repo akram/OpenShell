@@ -218,6 +218,34 @@ fn qualify_runtime() -> Result<(openshell_sandbox::RuntimeQualification, Qualifi
         .into_iter()
         .map(nix::unistd::Gid::as_raw)
         .collect::<Vec<_>>();
+
+    // Attest the broker's fail-closed guard from its *actual* behavior rather
+    // than deriving it from the kernel flag: a LegacyReadOnly listener must
+    // refuse task-memory output writes. If the guard ever regressed and started
+    // writing again, this drops to false while `cancellation` is already false,
+    // so `validate()` rejects the boundary instead of admitting the race.
+    let guard_fails_closed = {
+        use openshell_isolation_interface::linux::seccomp_notify::{
+            ListenerMode, NotificationListener,
+        };
+        use std::os::fd::{FromRawFd as _, OwnedFd};
+        // SAFETY: dup returns a new owned descriptor or a negative error.
+        let dup = unsafe { libc::dup(libc::STDERR_FILENO) };
+        dup >= 0
+            && NotificationListener::from_fd_with_mode(
+                // SAFETY: successful dup returned a new owned descriptor.
+                unsafe { OwnedFd::from_raw_fd(dup) },
+                ListenerMode::LegacyReadOnly,
+            )
+            .write_task_output(0, 0, 0, &[0_u8; 1])
+            .err()
+            .and_then(|error| error.raw_os_error())
+                == Some(libc::EOPNOTSUPP)
+    };
+    // Independent from `cancellation`: true only when the runtime listener is
+    // legacy AND the guard is verified to fail closed.
+    let task_memory_writes_disabled = !notification.wait_killable_recv && guard_fails_closed;
+
     let report = QualificationReport {
         qualified: true,
         uid,
@@ -247,7 +275,7 @@ fn qualify_runtime() -> Result<(openshell_sandbox::RuntimeQualification, Qualifi
         } else {
             "legacy_read_only"
         },
-        task_memory_writes_disabled: !notification.wait_killable_recv,
+        task_memory_writes_disabled,
     };
     let qualification = openshell_sandbox::RuntimeQualification {
         seccomp: openshell_isolation_interface::contract::SeccompEvidence {
@@ -260,9 +288,11 @@ fn qualify_runtime() -> Result<(openshell_sandbox::RuntimeQualification, Qualifi
             task_memory_read: notification.task_memory_copy(),
             task_memory_write: notification.task_memory_copy(),
             cancellation: notification.wait_killable_recv,
-            // Legacy plain listener (< 5.19) disables broker output writes;
-            // satisfies the `cancellation || writes_disabled` launch invariant.
-            task_memory_writes_disabled: !notification.wait_killable_recv,
+            // Independently attested above (not `!cancellation`): the broker's
+            // guard is verified to fail closed. The `cancellation ||
+            // task_memory_writes_disabled` invariant then rejects a guard
+            // regression instead of admitting the cancellation race.
+            task_memory_writes_disabled,
         },
         landlock_abi,
         landlock_allow_deny: true,
