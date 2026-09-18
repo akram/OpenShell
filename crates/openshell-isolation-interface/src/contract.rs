@@ -423,6 +423,10 @@ pub struct SeccompEvidence {
     pub task_memory_read: bool,
     pub task_memory_write: bool,
     pub cancellation: bool,
+    /// The broker disables every task-memory *output* write (legacy plain
+    /// listener on kernels < 5.19). Paired with `cancellation` in the
+    /// launch-safety invariant: one of the two must hold.
+    pub task_memory_writes_disabled: bool,
 }
 
 /// Driver-owned evidence that the mandatory outer network fence is installed.
@@ -562,14 +566,15 @@ impl SandboxConfirmEvidence {
             && self.seccomp.proc_fd_identity
             && self.seccomp.task_memory_read
             && self.seccomp.task_memory_write
-            // `cancellation` (seccomp WAIT_KILLABLE_RECV, Linux 5.19+) is NOT
-            // required to launch: on kernels < 5.19 the sandbox falls back to a
-            // plain listener and reports cancellation=false. That is safe only
-            // because the broker then fails closed on every task-memory output
-            // write (`NotificationListener::write_task_output`) rather than
-            // racing them, so containment holds without the flag. Do not gate
-            // launch on cancellation, but never write workload memory without
-            // routing through the guarded path above.
+            // Cancellation-safety invariant: `cancellation || writes_disabled`.
+            // Either the listener keeps the notified workload thread kill-only
+            // (WAIT_KILLABLE_RECV / cancellation, Linux 5.19+), or the broker
+            // disables every task-memory output write (legacy plain listener on
+            // kernels < 5.19). One of the two MUST hold so a signal-resumed
+            // syscall can never race a privileged write into workload memory.
+            // We do not remove cancellation unconditionally; we require the
+            // legacy read-only guarantee in its place.
+            && (self.seccomp.cancellation || self.seccomp.task_memory_writes_disabled)
             && self.landlock_abi >= 3
             && self.landlock_allow_deny
             && self.udp_dns_round_trip
