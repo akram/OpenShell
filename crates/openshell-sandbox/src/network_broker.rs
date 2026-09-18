@@ -1316,8 +1316,8 @@ fn classify_send(
                 if let Some(length_address) = message.result_length_address {
                     let length = u32::try_from(message.data.len())
                         .map_err(|_| io::Error::from_raw_os_error(libc::EMSGSIZE))?;
-                    listener.validate_id(notification.id)?;
-                    task_memory::write_exact(
+                    listener.write_task_output(
+                        notification.id,
                         notification.tid,
                         length_address,
                         &length.to_ne_bytes(),
@@ -1677,12 +1677,13 @@ fn write_socket_addr(
     let copied = usize::try_from(supplied_length)
         .unwrap_or(0)
         .min(bytes.len());
-    listener.validate_id(notification_id)?;
+    // Both writes fail closed on a plain listener (kernels < 5.19): without
+    // WAIT_KILLABLE_RECV the notified accept/getpeername could resume and
+    // repurpose these buffers between validation and the broker write.
     if copied != 0 {
-        task_memory::write_exact(tid, address, &bytes[..copied])?;
+        listener.write_task_output(notification_id, tid, address, &bytes[..copied])?;
     }
-    listener.validate_id(notification_id)?;
-    task_memory::write_exact(tid, length_address, &actual_length.to_ne_bytes())
+    listener.write_task_output(notification_id, tid, length_address, &actual_length.to_ne_bytes())
 }
 
 fn sockaddr_bytes(address: SocketAddr) -> io::Result<(Vec<u8>, libc::socklen_t)> {
