@@ -169,9 +169,15 @@ The sandbox reserves `SIGUSR2` with a non-restarting no-op handler for these
 broker threads; startup rejects a conflicting handler. This signal disposition
 is process-global kernel state, while registrations and cancellation state are
 owned by the broker. Workload exec resets the caught handler to its default.
-This sandbox runtime requires Linux 6.2 or newer for Landlock ABI v3 and treats
-`SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV` as mandatory so cancelled
-notifications cannot race task-memory writes.
+This sandbox runtime requires Landlock ABI v3 (Linux 6.2, or an equivalent
+vendor backport). `SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV` (Linux 5.19+) is used
+when the kernel supports it: it keeps a notified workload thread in a kill-only
+wait so a non-fatal signal cannot resume a mediated syscall between notification
+validation and the broker's result write. On kernels without the flag the
+listener falls back to a plain notifier and the broker fails closed on every
+task-memory *output* write — accept/getpeername addresses and sendmmsg lengths —
+rather than racing them; input mediation and outer-fence enforcement are
+unchanged.
 
 DNS uses an exact sandbox-local resolver at `127.0.0.53:53`. The driver sets the
 nameserver and permits an unprivileged bind to port 53. UDP and TCP DNS requests

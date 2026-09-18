@@ -223,6 +223,33 @@ impl NotificationListener {
         Ok(())
     }
 
+    /// Write broker-produced output into the notified task's memory, closing
+    /// the validation-to-write race that a plain listener cannot.
+    ///
+    /// `WAIT_KILLABLE_RECV` (Linux 5.19+) keeps the notified workload thread in
+    /// a kill-only wait, so a non-fatal signal cannot resume the mediated
+    /// syscall between `validate_id` and this write. Without it (kernels
+    /// < 5.19, the plain-listener fallback), a resumed syscall could repurpose
+    /// the target buffer while the privileged broker writes through the
+    /// captured tid and pointer — writing through `/proc/<tid>/mem` even into
+    /// pages the workload has since made read-only. There is no way to close
+    /// that window without the flag, so this fails closed (`EPERM`) rather than
+    /// racing. Callers must route every task-memory *output* write through this
+    /// method; input reads never write workload memory and are unaffected.
+    pub fn write_task_output(
+        &self,
+        id: u64,
+        tid: u32,
+        address: u64,
+        data: &[u8],
+    ) -> io::Result<()> {
+        if !self.wait_killable_recv {
+            return Err(io::Error::from_raw_os_error(libc::EPERM));
+        }
+        self.validate_id(id)?;
+        crate::linux::task_memory::write_exact(tid, address, data)
+    }
+
     /// Return a successful scalar result to the notifying syscall.
     pub fn respond_value(&self, id: u64, value: i64) -> io::Result<()> {
         self.validate_id(id)?;
@@ -330,13 +357,15 @@ pub fn install_listener(syscalls: &[i64]) -> io::Result<NotificationListener> {
     verify_notification_sizes()?;
     set_no_new_privileges()?;
 
-    // WAIT_KILLABLE_RECV (Linux 5.19+) makes the supervisor's notification
-    // receive interruptible by a fatal signal. Kernels older than 5.19 (for
-    // example RHEL 9.x / 5.14 nodes) reject the flag with EINVAL. Rather than
-    // refusing to start there, fall back to a plain listener: the notification
-    // receive is then uninterruptible, but the sandbox is otherwise fully
-    // functional. The resulting listener records `wait_killable_recv = false`
-    // so callers can observe the degraded cancellation semantics.
+    // WAIT_KILLABLE_RECV (Linux 5.19+) keeps the *notified workload thread* in
+    // a kill-only wait while the broker services its syscall, so a non-fatal
+    // signal cannot resume the syscall and repurpose its buffers underneath a
+    // pending broker write. Kernels older than 5.19 (for example RHEL 9.x /
+    // 5.14 nodes) reject the flag with EINVAL. Rather than refusing to start
+    // there, fall back to a plain listener so the sandbox boots; the resulting
+    // listener records `wait_killable_recv = false`, and the broker then fails
+    // closed on every task-memory output write (see `write_task_output`)
+    // instead of racing them. Input mediation is unaffected.
     match install_listener_with_flags(syscalls, true) {
         Ok(listener) => Ok(listener),
         Err(error) if error.raw_os_error() == Some(libc::EINVAL) => {
@@ -938,5 +967,26 @@ mod tests {
             .respond_errno(1, 0)
             .expect_err("zero errno must fail");
         assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn plain_listener_fails_closed_on_output_write() {
+        // A listener without WAIT_KILLABLE_RECV (kernels < 5.19) must refuse
+        // every task-memory output write rather than race a resumed syscall.
+        // The guard short-circuits before touching the descriptor or workload
+        // memory, so a dup of stderr is a sufficient stand-in.
+        // SAFETY: dup takes one valid descriptor and returns a new descriptor
+        // or a negative error without modifying memory.
+        let duplicated = unsafe { libc::dup(libc::STDERR_FILENO) };
+        assert!(duplicated >= 0, "duplicate stderr for validation test");
+        let listener = NotificationListener {
+            // SAFETY: successful dup returned a new owned descriptor.
+            fd: unsafe { OwnedFd::from_raw_fd(duplicated) },
+            wait_killable_recv: false,
+        };
+        let error = listener
+            .write_task_output(1, 0, 0, &[0_u8; 4])
+            .expect_err("plain listener must reject output writes");
+        assert_eq!(error.raw_os_error(), Some(libc::EPERM));
     }
 }
