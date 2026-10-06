@@ -141,26 +141,6 @@ sandboxServiceAccount:
   # -- Existing service account name for sandbox pods when sandboxServiceAccount.create is false.
   name: ""
 
-# RBAC objects created for the gateway ServiceAccount. Cluster-scoped objects
-# can be omitted so a cluster-admin applies them once and a namespace-admin
-# installs and upgrades the gateway release without cluster-scoped permissions.
-rbac:
-  # -- Create the RBAC objects that grant the gateway ServiceAccount access.
-  # Disable to supply the namespaced sandbox and peer Role/RoleBinding and the
-  # cluster-scoped ClusterRole/ClusterRoleBinding out of band. The certgen hook
-  # and credential driver RBAC keep their own flags.
-  create: true
-  clusterScoped:
-    # -- Create the cluster-scoped ClusterRole and ClusterRoleBinding. Disable
-    # for a namespace-admin install where a cluster-admin applies them
-    # separately; the gateway ServiceAccount name and namespace are unchanged,
-    # so a pre-created ClusterRoleBinding still matches.
-    create: true
-    # -- Name for the ClusterRole. Empty uses the `<fullname>-node-reader-<release namespace>` default.
-    clusterRoleName: ""
-    # -- Name for the ClusterRoleBinding. Empty uses the `<fullname>-node-reader-<release namespace>` default.
-    clusterRoleBindingName: ""
-
 # Namespace-scoped resources needed to run sandboxes. Disable this when the
 # gateway and workspace prerequisites are managed as separate Helm releases
 # using the openshell-workspace chart.
@@ -212,10 +192,8 @@ agentSandbox:
 
 # Pod restart behavior and health probe tuning.
 podLifecycle:
-  # -- Maximum time, in seconds, Kubernetes waits for the gateway to exit before
-  # killing it. The gateway exits as soon as shutdown completes; the limit
-  # covers supervisor session cleanup and draining queued OCSF records.
-  terminationGracePeriodSeconds: 30
+  # -- Grace period, in seconds, before Kubernetes terminates the gateway pod.
+  terminationGracePeriodSeconds: 5
 
 probes:
   startup:
@@ -270,31 +248,6 @@ server:
     endpoint: ""
     # -- Gateway OpenTelemetry service name. Empty uses openshell-gateway.
     serviceName: ""
-  # Gateway-native OCSF JSONL output.
-  ocsfLog:
-    # -- Write gateway OCSF events as JSONL.
-    enabled: false
-    # -- OCSF JSONL path. The default is writable in the gateway container but
-    # does not persist across restarts. To keep records, mount a volume with
-    # server.extraVolumes and server.extraVolumeMounts and set a path on it.
-    # When replicas share the volume, set subPathExpr: $(OPENSHELL_POD_NAME)
-    # on the mount so each replica writes its own file.
-    path: /tmp/gateway-ocsf.jsonl
-    # -- Optional OCSF downgrade target. Empty emits native OCSF 1.8.0.
-    # Supported values: "1.1", "1.3".
-    schemaVersion: ""
-    # -- Rotate the active file daily in UTC, or never.
-    rotation: daily
-    # -- Rotated files retained when rotation is daily.
-    maxFiles: 7
-    # -- Maximum records waiting for the file writer.
-    queueCapacity: 10000
-    # -- Maximum encoded bytes waiting for the file writer.
-    queueMaxBytes: 16777216
-  # -- Additional volumes for the gateway pod.
-  extraVolumes: []
-  # -- Additional volume mounts for the gateway container.
-  extraVolumeMounts: []
   # -- Enable anonymous OpenShell telemetry from the gateway and the sandbox
   # supervisors it launches.
   telemetryEnabled: true
@@ -328,13 +281,6 @@ server:
   # Set to a RuntimeClass name (e.g. "kata-containers", "nvidia") to apply it
   # to all sandboxes that don't explicitly override it.
   defaultRuntimeClassName: ""
-  # -- UID for sandbox pods (`sandbox_uid`). Empty (default) = use the OpenShift
-  # SCC namespace annotation if present, otherwise the driver default. Must be
-  # an integer between 1 and 4294967294.
-  sandboxUid: ""
-  # -- GID for sandbox pods (`sandbox_gid`). Empty (default) = same as
-  # sandboxUid. Must be an integer between 1 and 4294967294.
-  sandboxGid: ""
   # -- gRPC endpoint sandboxes call back into the gateway. Leave empty to derive
   # it from the chart fullname, release namespace, service port, and
   # disableTls flag, for example https://openshell.openshell.svc.cluster.local:8080.

@@ -219,6 +219,20 @@ fn capability_free_baseline_entries(root: &Path) -> Result<Vec<(PathBuf, OwnedFd
         }
         entries.push((entry.path(), fd));
     }
+    // On RHEL 9 kernels (backported Landlock), PathBeneath on /dev does not
+    // cross into the devpts mount at /dev/pts. Add /dev/pts explicitly so
+    // openpty() and tmux work inside the sandbox.
+    for devpts_path in ["/dev/pts", "/dev/shm"] {
+        let path = root.join(&devpts_path[1..]);
+        if let Ok(fd) = open(
+            &path,
+            OFlags::PATH | OFlags::DIRECTORY | OFlags::CLOEXEC,
+            Mode::empty(),
+        ) {
+            entries.push((path, fd));
+        }
+    }
+
     entries.sort_by(|left, right| left.0.cmp(&right.0));
     Ok(entries)
 }
