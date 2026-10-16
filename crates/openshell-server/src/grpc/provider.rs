@@ -4371,6 +4371,7 @@ async fn exchange_provider_subject_token_inner(
     let token_response = perform_intermediate_token_exchange(
         &token_grant.token_endpoint,
         &TokenExchangeParams {
+            client_id: Some(&gateway_claims.sub),
             client_assertion: &gateway_jwt_svid,
             client_assertion_type: &token_grant.client_assertion_type,
             subject_token: &stored_subject_token,
@@ -5795,6 +5796,7 @@ mod tests {
                 String::from_utf8_lossy(&request).to_ascii_lowercase()
             });
             let params = TokenExchangeParams {
+                client_id: None,
                 client_assertion: SECRET,
                 client_assertion_type: "",
                 subject_token: SECRET,

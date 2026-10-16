@@ -216,6 +216,7 @@ pub async fn obtain_provider_token(
                     perform_token_exchange(
                         request.token_endpoint,
                         &TokenExchangeParams {
+                            client_id: None,
                             client_assertion: &jwt_svid,
                             client_assertion_type: request.client_assertion_type,
                             subject_token: &intermediate.access_token,

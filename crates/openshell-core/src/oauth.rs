@@ -202,6 +202,11 @@ pub async fn post_oauth_token_grant(
 
 /// RFC 8693 token-exchange form fields.
 pub struct TokenExchangeParams<'a> {
+    /// Explicit `client_id` for authorization servers (e.g. Keycloak) that
+    /// require it alongside `client_assertion`. When `None` the parameter is
+    /// omitted and the server is expected to resolve the client from the
+    /// assertion's `sub` claim.
+    pub client_id: Option<&'a str>,
     /// Secret JWT client assertion sent only to the configured endpoint.
     pub client_assertion: &'a str,
     pub client_assertion_type: &'a str,
@@ -228,7 +233,7 @@ pub async fn post_oauth_token_exchange(
     let client_assertion_type = effective_client_assertion_type(params.client_assertion_type);
     let subject_token_type = effective_token_type(params.subject_token_type);
     let requested_token_type = effective_token_type(params.requested_token_type);
-    let form_params = vec![
+    let mut form_params = vec![
         ("grant_type", TOKEN_EXCHANGE_GRANT_TYPE),
         ("client_assertion_type", client_assertion_type),
         ("client_assertion", params.client_assertion),
@@ -236,6 +241,9 @@ pub async fn post_oauth_token_exchange(
         ("subject_token_type", subject_token_type),
         ("requested_token_type", requested_token_type),
     ];
+    if let Some(id) = params.client_id {
+        form_params.push(("client_id", id));
+    }
     post_oauth_token_request(
         client,
         token_endpoint,
@@ -858,6 +866,7 @@ mod tests {
             &client,
             &endpoint,
             &TokenExchangeParams {
+                client_id: None,
                 client_assertion: "jwt-svid-token",
                 client_assertion_type: "urn:ietf:params:oauth:client-assertion-type:jwt-spiffe",
                 subject_token: "subject-access-token",
@@ -925,6 +934,7 @@ mod tests {
             &client,
             &endpoint,
             &TokenExchangeParams {
+                client_id: None,
                 client_assertion: "jwt-svid-token",
                 client_assertion_type: "",
                 subject_token: "subject-token",
