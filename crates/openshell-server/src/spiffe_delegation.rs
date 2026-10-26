@@ -24,17 +24,46 @@ pub fn validate_config(config: &Config) -> Result<(), String> {
 
 /// The sandbox identity provider `config` enables, if any.
 ///
+/// When `[openshell.gateway.spiffe_delegation]` is set, uses the SPIRE admin
+/// socket for per-sandbox delegated SVIDs. Otherwise, falls back to the
+/// workload API if a SPIFFE socket is available (e.g. via CSI on OpenShift),
+/// using the gateway's own SVID for all exchanges.
+///
 /// # Errors
 ///
 /// Rejects what [`validate_config`] rejects.
 pub fn sandbox_identity_provider(
     config: &Config,
 ) -> Result<Option<Arc<dyn SandboxIdentityProvider<Error = TokenGrantFailure>>>, String> {
-    let Some(delegation) = enabled(config)? else {
-        return Ok(None);
-    };
-    let provider = openshell_spire::SpireDelegatedIdentity::new(delegation)?;
-    Ok(Some(Arc::new(provider)))
+    if let Some(delegation) = enabled(config)? {
+        let provider = openshell_spire::SpireDelegatedIdentity::new(delegation)?;
+        tracing::info!("sandbox identity provider: SPIRE delegation (admin socket)");
+        return Ok(Some(Arc::new(provider)));
+    }
+    if let Some(socket_path) = workload_api_socket_path() {
+        let gateway_spiffe_id = gateway_spiffe_id_from_env()
+            .ok_or("OPENSHELL_GATEWAY_SPIFFE_ID required for workload API identity fallback")?;
+        tracing::info!(%socket_path, %gateway_spiffe_id,
+            "sandbox identity provider: workload API (gateway-as-broker)");
+        let provider = crate::workload_api_identity::WorkloadApiIdentity::new(
+            socket_path,
+            gateway_spiffe_id,
+        );
+        return Ok(Some(Arc::new(provider)));
+    }
+    Ok(None)
+}
+
+fn workload_api_socket_path() -> Option<String> {
+    std::env::var("OPENSHELL_GATEWAY_SPIFFE_WORKLOAD_API_SOCKET")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+}
+
+fn gateway_spiffe_id_from_env() -> Option<String> {
+    std::env::var("OPENSHELL_GATEWAY_SPIFFE_ID")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
 }
 
 /// Validated delegation settings, when delegation is enabled.

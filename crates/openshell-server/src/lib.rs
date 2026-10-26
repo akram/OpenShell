@@ -44,6 +44,7 @@ mod sandbox_index;
 mod sandbox_watch;
 mod service_routing;
 mod spiffe_delegation;
+mod workload_api_identity;
 mod ssh_identity;
 mod ssh_sessions;
 mod storage_proto;
