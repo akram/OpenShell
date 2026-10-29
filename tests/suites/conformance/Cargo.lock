@@ -2102,6 +2102,7 @@ name = "openshell-extension-core"
 version = "0.0.0"
 dependencies = [
  "hyper-util",
+ "openshell-crypto",
  "serde",
  "thiserror 2.0.20",
  "tokio",
@@ -2157,6 +2158,7 @@ dependencies = [
  "linkme",
  "openshell-bootstrap",
  "openshell-core",
+ "openshell-crypto",
  "openshell-sdk",
  "openshell-testkit-macros",
  "quick-junit",
