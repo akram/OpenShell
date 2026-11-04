@@ -8,6 +8,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::time::Duration;
 
 use prost::Message;
 use tonic::{Code, Status};
@@ -21,6 +22,20 @@ use crate::rpc_error::{ERROR_DOMAIN, ErrorDetails, StatusExt};
 /// request, so every party can name the same exchange. The value is an opaque
 /// random ID and grants nothing.
 pub const REQUEST_ID_HEADER: &str = "x-openshell-request-id";
+
+/// Deadline for a single SPIRE agent call (SVID fetch or bundle fetch).
+pub const WORKLOAD_IDENTITY_CALL_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Deadline for the token service HTTP request.
+pub const TOKEN_SERVICE_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Deadline for one gateway-brokered provider access token request,
+/// including waiting for a concurrent acquisition of the same token.
+pub const BROKERED_TOKEN_GATEWAY_DEADLINE: Duration = Duration::from_secs(
+    4 * WORKLOAD_IDENTITY_CALL_TIMEOUT.as_secs()
+        + 2 * TOKEN_SERVICE_REQUEST_TIMEOUT.as_secs()
+        + 20,
+);
 
 const FAILURE_MESSAGE: &str = "dynamic token grant failed";
 const FAILURE_REASON: &str = "TOKEN_GRANT_FAILURE";

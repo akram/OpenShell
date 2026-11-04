@@ -12,6 +12,7 @@ repository.workspace = true
 
 [dependencies]
 openshell-crypto = { workspace = true, features = ["tls-tonic"] }
+openshell-spiffe = { path = "../openshell-spiffe" }
 async-trait = "0.1"
 openshell-extension-core = { path = "../openshell-extension-core" }
 openshell-policy-schema = { path = "../openshell-policy-schema" }

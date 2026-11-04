@@ -275,6 +275,11 @@ pub struct Config {
     /// flow (issue #1354).
     pub gateway_jwt: Option<GatewayJwtConfig>,
 
+    /// SPIFFE delegation settings for the gateway-owned sandbox identity
+    /// broker. When `Some`, the gateway can obtain per-sandbox JWT-SVIDs
+    /// and perform provider token exchange on their behalf.
+    pub spiffe_delegation: Option<SpiffeDelegationConfig>,
+
     /// Database URL for persistence.
     pub database_url: String,
 
@@ -978,6 +983,44 @@ fn default_gateway_id() -> String {
     "openshell".to_string()
 }
 
+/// SPIFFE delegation configuration for the gateway sandbox identity broker.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SpiffeDelegationConfig {
+    /// Path to the SPIRE agent socket (admin socket for Delegated Identity
+    /// API, or Workload API socket when `OPENSHELL_SPIFFE_WORKLOAD_API=true`).
+    pub admin_socket_path: String,
+    /// SPIFFE ID prefix for sandbox identities, e.g.
+    /// `spiffe://openshell.local/openshell`.
+    pub spiffe_id_prefix: String,
+    /// Supplementary GID permitted to open the admin socket.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admin_socket_group: Option<u32>,
+}
+
+impl SpiffeDelegationConfig {
+    /// Reject ambiguous paths and identities before opening the SPIRE socket.
+    pub fn validate(&self, gateway_id: &str) -> Result<(), String> {
+        let path = std::path::Path::new(&self.admin_socket_path);
+        if !path.is_absolute()
+            || path
+                .parent()
+                .is_none_or(|parent| parent == std::path::Path::new("/"))
+            || self
+                .admin_socket_path
+                .split('/')
+                .skip(1)
+                .any(|part| part.is_empty() || part == "." || part == "..")
+            || self.admin_socket_group == Some(0)
+        {
+            return Err("spiffe_delegation requires a canonical absolute socket path in a dedicated directory and a non-root socket group".into());
+        }
+        openshell_spiffe::SandboxSpiffeIdPrefix::parse(&self.spiffe_id_prefix)?
+            .sandbox_spiffe_id(gateway_id, "sandbox")?;
+        Ok(())
+    }
+}
+
 fn default_roles_claim() -> String {
     "realm_access.roles".to_string()
 }
@@ -1010,6 +1053,7 @@ impl Config {
             provider_profile_sources: vec![GatewayProviderProfileSourceConfig::User],
             mtls_auth: MtlsAuthConfig::default(),
             gateway_jwt: None,
+            spiffe_delegation: None,
             database_url: String::new(),
             database_max_connections: None,
             database_lock_max_connections: None,
