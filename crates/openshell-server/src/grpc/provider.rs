@@ -5,6 +5,10 @@
 
 #![allow(clippy::result_large_err)] // gRPC handlers return Result<Response<_>, Status>
 
+// TODO: wire access_token module once ServerState.sandbox_identity and
+// oauth helper changes from upstream PR #4732 are rebased.
+// pub(crate) mod access_token;
+
 use crate::compute::MutationScope;
 #[cfg(test)]
 use crate::credentials::RefreshMaterialScope;

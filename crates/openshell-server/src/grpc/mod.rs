@@ -41,6 +41,7 @@ use openshell_core::proto::{
     GetProviderProfileRequest, GetProviderRefreshStatusRequest, GetProviderRefreshStatusResponse,
     GetProviderRequest, GetSandboxConfigRequest, GetSandboxConfigResponse, GetSandboxLogsRequest,
     GetSandboxLogsResponse, GetSandboxPolicyStatusRequest, GetSandboxPolicyStatusResponse,
+    GetSandboxProviderAccessTokenRequest, GetSandboxProviderAccessTokenResponse,
     GetSandboxProviderEnvironmentRequest, GetSandboxProviderEnvironmentResponse,
     GetSandboxProviderStatusRequest, GetSandboxProviderStatusResponse, GetSandboxRequest,
     GetSandboxTemplateRequest, GetServiceRequest, GetWorkspaceRequest, GetWorkspaceResponse,
@@ -676,6 +677,15 @@ impl OpenShell for OpenShellService {
         request: Request<ExchangeProviderSubjectTokenRequest>,
     ) -> Result<Response<ExchangeProviderSubjectTokenResponse>, Status> {
         provider::handle_exchange_provider_subject_token(&self.state, request).await
+    }
+
+    async fn get_sandbox_provider_access_token(
+        &self,
+        _request: Request<GetSandboxProviderAccessTokenRequest>,
+    ) -> Result<Response<GetSandboxProviderAccessTokenResponse>, Status> {
+        Err(Status::unimplemented(
+            "sandbox provider access token broker is not yet wired in this build",
+        ))
     }
 
     async fn update_config(
