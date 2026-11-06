@@ -167,6 +167,13 @@ impl Default for CryptoContext {
     }
 }
 
+#[cfg(all(feature = "openssl", not(feature = "aws-lc")))]
+impl Default for CryptoContext {
+    fn default() -> Self {
+        Self::new(Box::new(openssl_backend::OpenSsl))
+    }
+}
+
 struct DefaultContext {
     context: CryptoContext,
     explicit: bool,
@@ -189,7 +196,16 @@ pub fn default_context() -> &'static CryptoContext {
             })
             .context
     }
-    #[cfg(not(feature = "aws-lc"))]
+    #[cfg(all(not(feature = "aws-lc"), feature = "openssl"))]
+    {
+        &DEFAULT
+            .get_or_init(|| DefaultContext {
+                context: CryptoContext::default(),
+                explicit: false,
+            })
+            .context
+    }
+    #[cfg(not(any(feature = "aws-lc", feature = "openssl")))]
     {
         &DEFAULT
             .get()
