@@ -57,25 +57,17 @@ COPY . .
 # Cargo target so the committed builder layer stays small.
 ARG NIX_DEVSHELL=default
 ARG OPENSSL_BACKEND=false
-# When OPENSSL_BACKEND=true, use the crypto devShell (OpenSSL 3.x, no cross)
-# and add z3 to the library path from a separate nix build.
-RUN if [ "${OPENSSL_BACKEND}" = "true" ]; then \
-      nix build .#packages.x86_64-linux.z3 --no-link 2>/dev/null || \
-      nix build .#legacyPackages.x86_64-linux.z3 --no-link 2>/dev/null || true; \
-    fi
 RUN nix develop .#${NIX_DEVSHELL} -c bash -euo pipefail -c '\
       CARGO_CMD="cargo auditable"; \
       command -v cargo-auditable >/dev/null 2>&1 || CARGO_CMD="cargo"; \
       BUILD_TARGET="--target x86_64-unknown-linux-gnu"; \
+      EXTRA_FEATURES=""; \
       if [ "'"${OPENSSL_BACKEND}"'" = "true" ]; then \
         BUILD_TARGET=""; \
-        Z3_LIB="$(nix build .#packages.x86_64-linux.z3 --print-out-paths --no-link 2>/dev/null || nix build .#legacyPackages.x86_64-linux.z3 --print-out-paths --no-link 2>/dev/null)/lib"; \
-        if [ -d "$Z3_LIB" ]; then \
-          export LIBRARY_PATH="$Z3_LIB${LIBRARY_PATH:+:$LIBRARY_PATH}"; \
-        fi; \
+        EXTRA_FEATURES="--features vendored-z3"; \
       fi; \
       GIT_DIR=/nonexistent $CARGO_CMD build --release \
-        $BUILD_TARGET \
+        $BUILD_TARGET $EXTRA_FEATURES \
         --package openshell-gateway --bin openshell-gateway' && \
     cp target/release/openshell-gateway /openshell-gateway 2>/dev/null || \
     cp target/x86_64-unknown-linux-gnu/release/openshell-gateway /openshell-gateway && \
