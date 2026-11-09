@@ -57,6 +57,8 @@ COPY . .
 # Cargo target so the committed builder layer stays small.
 ARG NIX_DEVSHELL=default
 ARG OPENSSL_BACKEND=false
+# Install python3 for vendored z3 CMake build when not in default devShell
+RUN apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
 RUN nix develop .#${NIX_DEVSHELL} -c bash -euo pipefail -c '\
       CARGO_CMD="cargo auditable"; \
       command -v cargo-auditable >/dev/null 2>&1 || CARGO_CMD="cargo"; \
