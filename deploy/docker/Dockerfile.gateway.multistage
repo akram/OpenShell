@@ -67,6 +67,7 @@ RUN nix develop .#${NIX_DEVSHELL} -c bash -euo pipefail -c '\
       if [ "'"${OPENSSL_BACKEND}"'" = "true" ]; then \
         BUILD_TARGET=""; \
         EXTRA_FEATURES="--features vendored-z3"; \
+        export OPENSSL_STATIC=1; \
       fi; \
       GIT_DIR=/nonexistent $CARGO_CMD build --release \
         $BUILD_TARGET $EXTRA_FEATURES \
