@@ -57,7 +57,9 @@ COPY . .
 # Cargo target so the committed builder layer stays small.
 ARG NIX_DEVSHELL=default
 RUN nix develop .#${NIX_DEVSHELL} -c bash -euo pipefail -c '\
-      GIT_DIR=/nonexistent cargo auditable build --release \
+      CARGO_CMD="cargo auditable"; \
+      command -v cargo-auditable >/dev/null 2>&1 || CARGO_CMD="cargo"; \
+      GIT_DIR=/nonexistent $CARGO_CMD build --release \
         --target x86_64-unknown-linux-gnu \
         --package openshell-gateway --bin openshell-gateway' && \
     cp target/x86_64-unknown-linux-gnu/release/openshell-gateway /openshell-gateway && \
