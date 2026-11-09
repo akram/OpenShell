@@ -56,29 +56,30 @@ COPY . .
 # single layer: build, stage the binary at /, then delete the Nix store and
 # Cargo target so the committed builder layer stays small.
 ARG NIX_DEVSHELL=default
-# Pre-build OpenSSL into the store when using the OpenSSL crypto backend.
-# The default devShell has z3 and the full cross toolchain; we add OpenSSL
-# lib/include paths so the openssl-sys crate finds the right library.
 ARG OPENSSL_BACKEND=false
+# When OPENSSL_BACKEND=true, use the crypto devShell (OpenSSL 3.x, no cross)
+# and add z3 to the library path from a separate nix build.
 RUN if [ "${OPENSSL_BACKEND}" = "true" ]; then \
-      nix build nixpkgs#openssl_3_5 nixpkgs#openssl_3_5.dev --no-link 2>/dev/null || true; \
+      nix build .#legacyPackages.x86_64-linux.z3 --no-link 2>/dev/null || \
+      nix build nixpkgs#z3 --no-link 2>/dev/null || true; \
     fi
 RUN nix develop .#${NIX_DEVSHELL} -c bash -euo pipefail -c '\
       CARGO_CMD="cargo auditable"; \
       command -v cargo-auditable >/dev/null 2>&1 || CARGO_CMD="cargo"; \
+      BUILD_TARGET="--target x86_64-unknown-linux-gnu"; \
       if [ "'"${OPENSSL_BACKEND}"'" = "true" ]; then \
-        SSL_LIB="$(nix build nixpkgs#openssl_3_5.out --print-out-paths --no-link)/lib"; \
-        SSL_INC="$(nix build nixpkgs#openssl_3_5.dev --print-out-paths --no-link)/include"; \
-        export OPENSSL_LIB_DIR="$SSL_LIB"; \
-        export OPENSSL_INCLUDE_DIR="$SSL_INC"; \
-        export OPENSSL_NO_VENDOR=1; \
-        export LIBRARY_PATH="$SSL_LIB${LIBRARY_PATH:+:$LIBRARY_PATH}"; \
-        export RUSTFLAGS="${RUSTFLAGS:-} -L native=$SSL_LIB"; \
+        BUILD_TARGET=""; \
+        Z3_LIB="$(nix build nixpkgs#z3.lib --print-out-paths --no-link 2>/dev/null)/lib"; \
+        if [ -d "$Z3_LIB" ]; then \
+          export LIBRARY_PATH="$Z3_LIB${LIBRARY_PATH:+:$LIBRARY_PATH}"; \
+        fi; \
       fi; \
       GIT_DIR=/nonexistent $CARGO_CMD build --release \
-        --target x86_64-unknown-linux-gnu \
+        $BUILD_TARGET \
         --package openshell-gateway --bin openshell-gateway' && \
-    cp target/x86_64-unknown-linux-gnu/release/openshell-gateway /openshell-gateway && \
+    BINARY="target/release/openshell-gateway"; \
+    [ -f "$BINARY" ] || BINARY="target/x86_64-unknown-linux-gnu/release/openshell-gateway"; \
+    cp "$BINARY" /openshell-gateway && \
     cd / && rm -rf /nix /build /root/.cache /tmp/*
 
 # ---- Runtime: identical to deploy/docker/Dockerfile.gateway ------------------
