@@ -67,9 +67,12 @@ RUN nix develop .#${NIX_DEVSHELL} -c bash -euo pipefail -c '\
       CARGO_CMD="cargo auditable"; \
       command -v cargo-auditable >/dev/null 2>&1 || CARGO_CMD="cargo"; \
       if [ "'"${OPENSSL_BACKEND}"'" = "true" ]; then \
-        export OPENSSL_LIB_DIR="$(nix build nixpkgs#openssl_3_5.out --print-out-paths --no-link)/lib"; \
-        export OPENSSL_INCLUDE_DIR="$(nix build nixpkgs#openssl_3_5.dev --print-out-paths --no-link)/include"; \
+        SSL_LIB="$(nix build nixpkgs#openssl_3_5.out --print-out-paths --no-link)/lib"; \
+        SSL_INC="$(nix build nixpkgs#openssl_3_5.dev --print-out-paths --no-link)/include"; \
+        export OPENSSL_LIB_DIR="$SSL_LIB"; \
+        export OPENSSL_INCLUDE_DIR="$SSL_INC"; \
         export OPENSSL_NO_VENDOR=1; \
+        export RUSTFLAGS="${RUSTFLAGS:-} -L $SSL_LIB"; \
       fi; \
       GIT_DIR=/nonexistent $CARGO_CMD build --release \
         --target x86_64-unknown-linux-gnu \
