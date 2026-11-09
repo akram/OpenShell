@@ -67,25 +67,28 @@ RUN nix develop .#${NIX_DEVSHELL} -c bash -euo pipefail -c '\
       if [ "'"${OPENSSL_BACKEND}"'" = "true" ]; then \
         BUILD_TARGET=""; \
         EXTRA_FEATURES="--features vendored-z3"; \
-        export OPENSSL_STATIC=1; \
       fi; \
       GIT_DIR=/nonexistent $CARGO_CMD build --release \
         $BUILD_TARGET $EXTRA_FEATURES \
         --package openshell-gateway --bin openshell-gateway' && \
     cp target/release/openshell-gateway /openshell-gateway 2>/dev/null || \
     cp target/x86_64-unknown-linux-gnu/release/openshell-gateway /openshell-gateway && \
+    mkdir -p /runtime-libs && \
+    if [ "'"${OPENSSL_BACKEND}"'" = "true" ]; then \
+      ldd /openshell-gateway | grep -oP '/nix/store/\S+' | xargs -I{} cp -L {} /runtime-libs/ 2>/dev/null || true; \
+    fi && \
     cd / && rm -rf /nix /build /root/.cache /tmp/*
 
-# ---- Runtime: identical to deploy/docker/Dockerfile.gateway ------------------
-#
-# Distroless Debian provides the glibc runtime required by the binary.
+# ---- Runtime ----------------------------------------------------------------
 FROM ${GATEWAY_BASE_IMAGE} AS gateway
 
 ARG TARGETARCH
+ARG OPENSSL_BACKEND=false
 
 WORKDIR /app
 
 COPY --from=builder /openshell-gateway /usr/local/bin/openshell-gateway
+COPY --from=builder /runtime-libs/ /usr/lib/
 
 USER 1000:1000
 EXPOSE 8080
