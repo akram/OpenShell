@@ -56,9 +56,21 @@ COPY . .
 # single layer: build, stage the binary at /, then delete the Nix store and
 # Cargo target so the committed builder layer stays small.
 ARG NIX_DEVSHELL=default
+# Pre-build OpenSSL into the store when using the OpenSSL crypto backend.
+# The default devShell has z3 and the full cross toolchain; we add OpenSSL
+# lib/include paths so the openssl-sys crate finds the right library.
+ARG OPENSSL_BACKEND=false
+RUN if [ "${OPENSSL_BACKEND}" = "true" ]; then \
+      nix build nixpkgs#openssl_3_5 nixpkgs#openssl_3_5.dev --no-link 2>/dev/null || true; \
+    fi
 RUN nix develop .#${NIX_DEVSHELL} -c bash -euo pipefail -c '\
       CARGO_CMD="cargo auditable"; \
       command -v cargo-auditable >/dev/null 2>&1 || CARGO_CMD="cargo"; \
+      if [ "'"${OPENSSL_BACKEND}"'" = "true" ]; then \
+        export OPENSSL_LIB_DIR="$(nix build nixpkgs#openssl_3_5 --print-out-paths --no-link)/lib"; \
+        export OPENSSL_INCLUDE_DIR="$(nix build nixpkgs#openssl_3_5.dev --print-out-paths --no-link)/include"; \
+        export OPENSSL_NO_VENDOR=1; \
+      fi; \
       GIT_DIR=/nonexistent $CARGO_CMD build --release \
         --target x86_64-unknown-linux-gnu \
         --package openshell-gateway --bin openshell-gateway' && \
