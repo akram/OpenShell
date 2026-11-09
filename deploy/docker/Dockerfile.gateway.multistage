@@ -55,7 +55,8 @@ COPY . .
 # the binary runs on distroless without post-processing. Everything runs in a
 # single layer: build, stage the binary at /, then delete the Nix store and
 # Cargo target so the committed builder layer stays small.
-RUN nix develop -c bash -euo pipefail -c '\
+ARG NIX_DEVSHELL=default
+RUN nix develop .#${NIX_DEVSHELL} -c bash -euo pipefail -c '\
       GIT_DIR=/nonexistent cargo auditable build --release \
         --target x86_64-unknown-linux-gnu \
         --package openshell-gateway --bin openshell-gateway' && \
