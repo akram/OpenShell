@@ -36,6 +36,9 @@ tracing = { workspace = true }
 
 [features]
 test-support = []
+## Forward the host binary's crypto backend selection to the storage drivers.
+aws-lc = ["openshell-driver-vault/aws-lc", "openshell-driver-kubernetes-secrets/aws-lc"]
+openssl = ["openshell-driver-vault/openssl", "openshell-driver-kubernetes-secrets/openssl"]
 
 [dev-dependencies]
 tempfile = "3"

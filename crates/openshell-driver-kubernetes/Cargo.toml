@@ -15,7 +15,8 @@ name = "openshell-driver-kubernetes"
 path = "src/main.rs"
 
 [dependencies]
-openshell-crypto = { workspace = true, features = ["aws-lc", "tls-kube"] }
+# Backend selection is forwarded by the consuming binary; see [features] below.
+openshell-crypto = { workspace = true, features = ["tls-kube"] }
 openshell-core = { path = "../openshell-core", default-features = false, features = ["jwt", "otel", "clap"] }
 openshell-isolation-interface = { path = "../openshell-isolation-interface" }
 openshell-sandbox-backend = { path = "../openshell-sandbox-backend" }
@@ -52,6 +53,11 @@ hyper = { workspace = true }
 hyper-util = { workspace = true }
 rustls = { workspace = true }
 tokio-rustls = { workspace = true }
+
+[features]
+## Forward the host binary's crypto backend selection to this driver.
+aws-lc = ["openshell-crypto/aws-lc"]
+openssl = ["openshell-crypto/openssl"]
 
 [dev-dependencies]
 openshell-otel-test-support = { path = "../openshell-otel-test-support" }

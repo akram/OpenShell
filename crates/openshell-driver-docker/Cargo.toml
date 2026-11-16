@@ -15,8 +15,8 @@ name = "openshell-driver-docker"
 path = "src/main.rs"
 
 [dependencies]
-# Product backend selection also applies when building without default features.
-openshell-crypto = { workspace = true, features = ["aws-lc"] }
+# Backend selection is forwarded by the consuming binary; see [features] below.
+openshell-crypto = { workspace = true }
 openshell-core = { path = "../openshell-core", default-features = false, features = ["driver-extraction", "otel", "clap"] }
 openshell-isolation-interface = { path = "../openshell-isolation-interface" }
 openshell-sandbox-backend = { path = "../openshell-sandbox-backend" }
@@ -48,6 +48,11 @@ rustix = { workspace = true }
 libc = "0.2"
 tar = "0.4"
 tempfile = "3"
+
+[features]
+## Forward the host binary's crypto backend selection to this driver.
+aws-lc = ["openshell-crypto/aws-lc"]
+openssl = ["openshell-crypto/openssl"]
 
 [dev-dependencies]
 openshell-otel-test-support = { path = "../openshell-otel-test-support" }

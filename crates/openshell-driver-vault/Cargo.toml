@@ -15,7 +15,8 @@ name = "openshell-driver-vault"
 path = "src/main.rs"
 
 [dependencies]
-openshell-crypto = { workspace = true, features = ["aws-lc"] }
+# Backend selection is forwarded by the consuming binary; see [features] below.
+openshell-crypto = { workspace = true }
 openshell-core = { path = "../openshell-core", default-features = false }
 
 clap = { workspace = true }
@@ -32,6 +33,11 @@ tonic = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
+
+[features]
+## Forward the host binary's crypto backend selection to this driver.
+aws-lc = ["openshell-crypto/aws-lc"]
+openssl = ["openshell-crypto/openssl"]
 
 [dev-dependencies]
 rcgen = { workspace = true }
