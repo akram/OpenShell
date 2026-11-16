@@ -44,8 +44,18 @@ pub enum CryptoError {
 /// Module status, scoped to this backend's operations, not the deployment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FipsState {
-    /// No validated operating mode is asserted.
+    /// No validated operating mode is asserted. The backend has no way to
+    /// query its own provider state (for example, AWS-LC here is not the
+    /// separately certified AWS-LC-FIPS variant).
     NotVerified,
+    /// The backend queried its provider and the FIPS provider is active for
+    /// default-property operations. This reflects the provider's own report,
+    /// not an attestation that every operation this backend performs is
+    /// FIPS-approved; see `CRYPTO.md` for what still requires separate
+    /// evidence.
+    Active,
+    /// The backend queried its provider and the FIPS provider is not active.
+    Inactive,
 }
 
 /// Operations implemented by a backend. Protocol coverage is documented separately.
@@ -151,12 +161,15 @@ impl CryptoContext {
         self.backend.as_ref()
     }
 
-    /// Verify the backend's limited posture. Strict FIPS is deliberately unsupported.
+    /// Verify the backend's limited posture. A strict request fails closed
+    /// unless the backend itself reports its FIPS provider as active;
+    /// `FipsState::NotVerified` is never sufficient for a strict request.
     pub fn verify_posture(&self, require_fips: bool) -> Result<Capabilities, CryptoError> {
-        if require_fips {
+        let capabilities = self.backend.capabilities();
+        if require_fips && capabilities.fips != FipsState::Active {
             return Err(CryptoError::UnsupportedPosture);
         }
-        Ok(self.backend.capabilities())
+        Ok(capabilities)
     }
 }
 

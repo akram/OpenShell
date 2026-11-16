@@ -31,6 +31,39 @@ mod jwt;
 #[derive(Debug, Default, Clone, Copy)]
 pub struct OpenSsl;
 
+// OpenSSL >= 3.0 only. The safe `openssl` crate's `fips` module wraps the
+// retired 1.0.2 FIPS object module's `FIPS_mode`/`FIPS_mode_set` and is
+// explicitly excluded on ossl300. This queries the OpenSSL 3 provider-based
+// mechanism instead (the one RHEL's FIPS packaging actually uses). Declared
+// directly rather than through openssl-sys: that crate's own `ossl300` cfg is
+// set by its build script for its own compilation only and is not visible to
+// this crate, so this symbol is requested unconditionally and resolves
+// against whatever libcrypto this backend is already linked against. This
+// makes OpenSSL >= 3.0 a hard requirement for the `openssl` feature, which
+// matches this backend's purpose.
+#[allow(unsafe_code)]
+unsafe extern "C" {
+    fn EVP_default_properties_is_fips_enabled(libctx: *mut std::ffi::c_void) -> std::ffi::c_int;
+}
+
+/// Reports whether the process's default library context currently has the
+/// FIPS provider active for default-property operations. This is the
+/// provider's own report; it is not a substitute for the deployment evidence
+/// `CRYPTO.md` documents as still required.
+#[allow(unsafe_code)]
+fn fips_state() -> FipsState {
+    // SAFETY: NULL selects the process's default library context, matching
+    // this backend's documented "default context, no provider overrides"
+    // design. The function takes no other arguments and performs no caller-
+    // owned allocation.
+    let is_fips_enabled = unsafe { EVP_default_properties_is_fips_enabled(std::ptr::null_mut()) };
+    if is_fips_enabled != 0 {
+        FipsState::Active
+    } else {
+        FipsState::Inactive
+    }
+}
+
 struct Sha256(Hasher);
 impl Digest for Sha256 {
     fn update(&mut self, bytes: &[u8]) -> Result<(), CryptoError> {
@@ -53,7 +86,7 @@ impl CryptoBackend for OpenSsl {
             // The library version is not the identity/version of the provider
             // module that performed an operation in the default context.
             provider_version: None,
-            fips: FipsState::NotVerified,
+            fips: fips_state(),
             primitives: &["CSPRNG", "SHA-256", "AES-256-GCM"],
             key_algorithms: &["ECDSA-P256-SHA256", "ECDSA-P384-SHA384", "Ed25519", "RSA"],
         }

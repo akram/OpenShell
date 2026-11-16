@@ -38,11 +38,22 @@ fn primitives_and_posture() {
     let caps = context.verify_posture(false).unwrap();
     assert_eq!(caps.backend, "openssl");
     assert_eq!(caps.provider_version, None);
-    assert_eq!(caps.fips, openshell_crypto::FipsState::NotVerified);
-    assert_eq!(
-        context.verify_posture(true),
-        Err(CryptoError::UnsupportedPosture)
-    );
+    // The backend always resolves a definite judgment on OpenSSL >= 3.0;
+    // whether it is Active depends on this process's actual provider
+    // configuration, which a strict request must agree with.
+    assert_ne!(caps.fips, openshell_crypto::FipsState::NotVerified);
+    match caps.fips {
+        openshell_crypto::FipsState::Active => {
+            assert!(context.verify_posture(true).is_ok());
+        }
+        openshell_crypto::FipsState::Inactive => {
+            assert_eq!(
+                context.verify_posture(true),
+                Err(CryptoError::UnsupportedPosture)
+            );
+        }
+        openshell_crypto::FipsState::NotVerified => unreachable!(),
+    }
 }
 
 #[test]
