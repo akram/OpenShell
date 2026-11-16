@@ -74,6 +74,7 @@ ARG CRYPTO_BACKEND=aws-lc
 RUN if [ "${CRYPTO_BACKEND}" = "openssl" ]; then \
       eval "$(nix print-dev-env .#crypto | grep -E '^declare -x OPENSSL_(LIB|INCLUDE)_DIR=')" && \
       nix develop -c env \
+        -u AWS_LC_SYS_SYSTEM_DIR -u AWS_LC_SYS_SYSTEM_DIR_x86_64_unknown_linux_gnu \
         OPENSSL_LIB_DIR="${OPENSSL_LIB_DIR}" OPENSSL_INCLUDE_DIR="${OPENSSL_INCLUDE_DIR}" \
         OPENSSL_NO_VENDOR=1 OPENSSL_STATIC=0 AWS_LC_SYS_USE_SYSTEM=0 \
         bash -euo pipefail -c '\
