@@ -63,19 +63,25 @@ COPY . .
 # The default devShell's release toolchain exposes an unprefixed system
 # AWS-LC libcrypto/libssl shim that silently satisfies most of the `openssl`
 # crate's link requirements but is missing OpenSSL-3-only symbols (e.g.
-# EVP_default_properties_is_fips_enabled), so an openssl-feature build must
-# use the flake's dedicated `crypto` devShell instead, which points
-# OPENSSL_LIB_DIR/OPENSSL_INCLUDE_DIR at a real OpenSSL 3.5 and disables the
-# AWS-LC system shim (see flake.nix devShells.crypto). That shell has no
-# cargo-auditable, so use plain `cargo build` on this path; SBOM/provenance
-# metadata is a CI concern, not this validation build's.
+# EVP_default_properties_is_fips_enabled). flake.nix's dedicated `crypto`
+# devShell fixes exactly this (OPENSSL_LIB_DIR/OPENSSL_INCLUDE_DIR pointed at
+# a real OpenSSL 3.5, AWS_LC_SYS_USE_SYSTEM=0), but it is a minimal shell for
+# crypto-crate-only tests: it has no z3/aws-lc toolchain wiring and the full
+# gateway binary needs libz3 regardless of crypto backend. So: stay in the
+# default shell (z3, cargo-auditable) and layer the `crypto` shell's env vars
+# on top via `env`, read from the flake itself rather than duplicated here.
 ARG CRYPTO_BACKEND=aws-lc
 RUN if [ "${CRYPTO_BACKEND}" = "openssl" ]; then \
-      nix develop .#crypto -c bash -euo pipefail -c '\
-        GIT_DIR=/nonexistent cargo build --release \
-          --target x86_64-unknown-linux-gnu \
-          --package openshell-gateway --bin openshell-gateway \
-          --no-default-features --features "telemetry,in-tree-compute-drivers,crypto-openssl"'; \
+      OPENSSL_LIB_DIR="$(nix eval --raw .#devShells.x86_64-linux.crypto.env.OPENSSL_LIB_DIR)" && \
+      OPENSSL_INCLUDE_DIR="$(nix eval --raw .#devShells.x86_64-linux.crypto.env.OPENSSL_INCLUDE_DIR)" && \
+      nix develop -c env \
+        OPENSSL_LIB_DIR="${OPENSSL_LIB_DIR}" OPENSSL_INCLUDE_DIR="${OPENSSL_INCLUDE_DIR}" \
+        OPENSSL_NO_VENDOR=1 OPENSSL_STATIC=0 AWS_LC_SYS_USE_SYSTEM=0 \
+        bash -euo pipefail -c '\
+          GIT_DIR=/nonexistent cargo auditable build --release \
+            --target x86_64-unknown-linux-gnu \
+            --package openshell-gateway --bin openshell-gateway \
+            --no-default-features --features "telemetry,in-tree-compute-drivers,crypto-openssl"'; \
     else \
       nix develop -c bash -euo pipefail -c '\
         GIT_DIR=/nonexistent cargo auditable build --release \
