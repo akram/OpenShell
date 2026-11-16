@@ -59,12 +59,30 @@ COPY . .
 # Backend selection is a real Cargo feature on the gateway binary
 # (crypto-aws-lc / crypto-openssl), not a Cargo.toml text patch: every crate
 # in the gateway's dependency path forwards whichever one is selected here.
+#
+# The default devShell's release toolchain exposes an unprefixed system
+# AWS-LC libcrypto/libssl shim that silently satisfies most of the `openssl`
+# crate's link requirements but is missing OpenSSL-3-only symbols (e.g.
+# EVP_default_properties_is_fips_enabled), so an openssl-feature build must
+# use the flake's dedicated `crypto` devShell instead, which points
+# OPENSSL_LIB_DIR/OPENSSL_INCLUDE_DIR at a real OpenSSL 3.5 and disables the
+# AWS-LC system shim (see flake.nix devShells.crypto). That shell has no
+# cargo-auditable, so use plain `cargo build` on this path; SBOM/provenance
+# metadata is a CI concern, not this validation build's.
 ARG CRYPTO_BACKEND=aws-lc
-RUN nix develop -c bash -euo pipefail -c '\
-      GIT_DIR=/nonexistent cargo auditable build --release \
-        --target x86_64-unknown-linux-gnu \
-        --package openshell-gateway --bin openshell-gateway \
-        --no-default-features --features "telemetry,in-tree-compute-drivers,crypto-${CRYPTO_BACKEND}"' && \
+RUN if [ "${CRYPTO_BACKEND}" = "openssl" ]; then \
+      nix develop .#crypto -c bash -euo pipefail -c '\
+        GIT_DIR=/nonexistent cargo build --release \
+          --target x86_64-unknown-linux-gnu \
+          --package openshell-gateway --bin openshell-gateway \
+          --no-default-features --features "telemetry,in-tree-compute-drivers,crypto-openssl"'; \
+    else \
+      nix develop -c bash -euo pipefail -c '\
+        GIT_DIR=/nonexistent cargo auditable build --release \
+          --target x86_64-unknown-linux-gnu \
+          --package openshell-gateway --bin openshell-gateway \
+          --no-default-features --features "telemetry,in-tree-compute-drivers,crypto-aws-lc"'; \
+    fi && \
     cp target/x86_64-unknown-linux-gnu/release/openshell-gateway /openshell-gateway && \
     cd / && rm -rf /nix /build /root/.cache /tmp/*
 
