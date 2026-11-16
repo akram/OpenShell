@@ -80,6 +80,7 @@ RUN if [ "${CRYPTO_BACKEND}" = "openssl" ]; then \
         OPENSSL_LIB_DIR="${OPENSSL_LIB_DIR}" OPENSSL_INCLUDE_DIR="${OPENSSL_INCLUDE_DIR}" \
         OPENSSL_NO_VENDOR=1 OPENSSL_STATIC=0 AWS_LC_SYS_USE_SYSTEM=0 \
         bash -euo pipefail -c '\
+          export RUSTFLAGS="-L $OPENSSL_LIB_DIR ${RUSTFLAGS:-}" && \
           GIT_DIR=/nonexistent cargo auditable build --release \
             --target x86_64-unknown-linux-gnu \
             --package openshell-gateway --bin openshell-gateway \
