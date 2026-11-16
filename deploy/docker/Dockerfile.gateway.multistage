@@ -55,14 +55,16 @@ COPY . .
 # the binary runs on distroless without post-processing. Everything runs in a
 # single layer: build, stage the binary at /, then delete the Nix store and
 # Cargo target so the committed builder layer stays small.
+#
+# Backend selection is a real Cargo feature on the gateway binary
+# (crypto-aws-lc / crypto-openssl), not a Cargo.toml text patch: every crate
+# in the gateway's dependency path forwards whichever one is selected here.
 ARG CRYPTO_BACKEND=aws-lc
-RUN if [ "${CRYPTO_BACKEND}" = "openssl" ]; then \
-      sed -i 's/features = \["aws-lc"\]/features = ["openssl"]/' crates/openshell-gateway/Cargo.toml; \
-    fi
 RUN nix develop -c bash -euo pipefail -c '\
       GIT_DIR=/nonexistent cargo auditable build --release \
         --target x86_64-unknown-linux-gnu \
-        --package openshell-gateway --bin openshell-gateway' && \
+        --package openshell-gateway --bin openshell-gateway \
+        --no-default-features --features "telemetry,in-tree-compute-drivers,crypto-${CRYPTO_BACKEND}"' && \
     cp target/x86_64-unknown-linux-gnu/release/openshell-gateway /openshell-gateway && \
     cd / && rm -rf /nix /build /root/.cache /tmp/*
 
