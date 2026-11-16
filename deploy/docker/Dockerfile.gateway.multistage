@@ -72,7 +72,9 @@ COPY . .
 # on top via `env`, read from the flake itself rather than duplicated here.
 ARG CRYPTO_BACKEND=aws-lc
 RUN if [ "${CRYPTO_BACKEND}" = "openssl" ]; then \
-      eval "$(nix print-dev-env .#crypto | grep -E '^declare -x OPENSSL_(LIB|INCLUDE)_DIR=')" && \
+      OPENSSL_LIB_DIR="$(bash -c 'source <(nix print-dev-env .#crypto) >/dev/null 2>&1; printf %s "$OPENSSL_LIB_DIR"')" && \
+      OPENSSL_INCLUDE_DIR="$(bash -c 'source <(nix print-dev-env .#crypto) >/dev/null 2>&1; printf %s "$OPENSSL_INCLUDE_DIR"')" && \
+      test -n "${OPENSSL_LIB_DIR}" && test -n "${OPENSSL_INCLUDE_DIR}" && \
       nix develop -c env \
         -u AWS_LC_SYS_SYSTEM_DIR -u AWS_LC_SYS_SYSTEM_DIR_x86_64_unknown_linux_gnu \
         OPENSSL_LIB_DIR="${OPENSSL_LIB_DIR}" OPENSSL_INCLUDE_DIR="${OPENSSL_INCLUDE_DIR}" \
