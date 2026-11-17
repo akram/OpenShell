@@ -5643,7 +5643,7 @@ dependencies = [
 [[package]]
 name = "pageant"
 version = "0.2.5"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#b36f79c7ebf37b78730fd38d7706e645103ccd06"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#0c3f6afcba7950ff741c41f26bb70465864b232d"
 dependencies = [
  "base16ct",
  "byteorder",
@@ -6879,7 +6879,7 @@ dependencies = [
 [[package]]
 name = "russh"
 version = "0.65.2"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#b36f79c7ebf37b78730fd38d7706e645103ccd06"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#0c3f6afcba7950ff741c41f26bb70465864b232d"
 dependencies = [
  "aes",
  "aws-lc-rs",
@@ -6950,7 +6950,7 @@ dependencies = [
 [[package]]
 name = "russh-cryptovec"
 version = "0.62.0"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#b36f79c7ebf37b78730fd38d7706e645103ccd06"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#0c3f6afcba7950ff741c41f26bb70465864b232d"
 dependencies = [
  "log",
  "nix 0.31.3",
@@ -6981,7 +6981,7 @@ dependencies = [
 [[package]]
 name = "russh-util"
 version = "0.52.0"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#b36f79c7ebf37b78730fd38d7706e645103ccd06"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#0c3f6afcba7950ff741c41f26bb70465864b232d"
 dependencies = [
  "chrono",
  "tokio",
