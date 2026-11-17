@@ -193,3 +193,12 @@ debug = 1
 # is ~10x slower, which times out broker tests.
 [profile.dev.package.sha2]
 opt-level = 3
+
+# RHOAIENG-97009: forks adding an optional OpenSSL-backed crypto backend
+# (feature `openssl`), for FIPS builds where `aws-lc-rs`'s own crypto isn't
+# an attested/certified module. russh needs ssh-key pinned to exactly
+# 0.7.0-rc.12 (`=` requirement in russh/Cargo.toml), so the ssh-key fork is
+# rebased on that exact upstream tag.
+[patch.crates-io]
+russh = { git = "https://github.com/akram/russh", branch = "feat/optional-openssl-gcm-backend" }
+ssh-key = { git = "https://github.com/akram/rust-ssh-key", branch = "feat/openssl-rsa-backend" }

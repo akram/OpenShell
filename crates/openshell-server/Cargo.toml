@@ -102,7 +102,7 @@ async-trait = "0.1"
 url = { workspace = true }
 glob = { workspace = true }
 hex = "0.4"
-russh = "0.65.0"
+russh = { version = "0.65.0", default-features = false, features = ["flate2", "rsa"] }
 rand = { workspace = true }
 rand-ssh = { package = "rand", version = "0.10" }
 petname = "2"
@@ -114,7 +114,12 @@ arc-swap = "1"
 notify = "8"
 
 [features]
-default = ["telemetry"]
+## `aws-lc` matches the project-wide default (openshell-gateway's own default
+## is `crypto-aws-lc`); needed here now that russh's own default features no
+## longer implicitly select a crypto backend (see the `aws-lc`/`openssl`
+## features below), so building/testing this crate in isolation still gets a
+## working backend without the host binary having to forward one.
+default = ["telemetry", "aws-lc"]
 ## Compile in anonymous telemetry emission (forwards to openshell-core/telemetry).
 ## On by default; build with `--no-default-features` for a telemetry-free gateway
 ## that contains no telemetry endpoint, HTTP client, or emission code.
@@ -122,9 +127,10 @@ telemetry = ["openshell-core/telemetry"]
 vendored-z3 = ["openshell-prover/vendored-z3"]
 prebuilt-z3 = ["openshell-prover/prebuilt-z3"]
 test-support = ["openshell-credential-issuer/test-support"]
-## Forward the host binary's crypto backend selection to the credential issuer.
-aws-lc = ["openshell-credential-issuer/aws-lc"]
-openssl = ["openshell-credential-issuer/openssl"]
+## Forward the host binary's crypto backend selection to the credential issuer
+## and to the SSH transport (russh).
+aws-lc = ["openshell-credential-issuer/aws-lc", "russh/aws-lc-rs"]
+openssl = ["openshell-credential-issuer/openssl", "russh/openssl"]
 
 [build-dependencies]
 tonic-prost-build = { workspace = true }
