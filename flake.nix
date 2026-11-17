@@ -97,6 +97,24 @@
           (pkgs.callPackage ./nix/pkgs/z3.nix { inherit stdenv; })
           (pkgs.callPackage ./nix/pkgs/aws-lc.nix { inherit stdenv; })
         ];
+        # Same cross sysroots, minus aws-lc.nix. The release toolchains above
+        # bake an unprefixed AWS-LC libcrypto/libssl shim straight into each
+        # target's --sysroot (via aws-lc.nix), so it sits on the linker's
+        # default search path for every build regardless of Cargo feature
+        # selection. That's fine for the default crypto-aws-lc build, but it
+        # silently satisfies most of the real `openssl` crate's link
+        # requirements with AWS-LC's compat shim instead, which exposes
+        # several OpenSSL-3-only symbols (the ASN1_ITEM accessors among them)
+        # with an incompatible type (STT_OBJECT vs. OpenSSL 3.x's STT_FUNC),
+        # so the linker errors on duplicate, type-mismatched definitions once
+        # the real OpenSSL 3.5 is also linked in. These openssl toolchains
+        # keep z3 (the gateway binary needs it regardless of crypto backend)
+        # but drop aws-lc.nix, so the devShells.crypto shell below links
+        # cleanly against only the OpenSSL it's pointed at.
+        opensslBuildInputs = { pkgs, stdenv }: [
+          (pkgs.callPackage ./nix/pkgs/z3.nix { inherit stdenv; })
+          (pkgs.callPackage ./nix/pkgs/openssl.nix { inherit stdenv; })
+        ];
         inherit (import ./nix/toolchain) mkToolchain;
         toolchains = {
           x86_64-gnu = mkToolchain {
@@ -121,6 +139,35 @@
             inherit pkgs buildInputs;
           };
         };
+        opensslToolchains = {
+          x86_64-gnu = mkToolchain {
+            pkgs = pkgs.pkgsCross.gnu64;
+            buildInputs = opensslBuildInputs;
+          };
+          x86_64-musl = mkToolchain {
+            pkgs = pkgs.pkgsCross.musl64;
+            buildInputs = opensslBuildInputs;
+          };
+          aarch64-gnu = mkToolchain {
+            pkgs = pkgs.pkgsCross.aarch64-multiplatform;
+            buildInputs = opensslBuildInputs;
+          };
+          aarch64-musl = mkToolchain {
+            pkgs = pkgs.pkgsCross.aarch64-multiplatform-musl;
+            buildInputs = opensslBuildInputs;
+          };
+        }
+        // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
+          aarch64-darwin = mkToolchain {
+            inherit pkgs;
+            buildInputs = opensslBuildInputs;
+          };
+        };
+        # opensslBuildInputs' second entry (see above): the OpenSSL built
+        # against the x86_64-gnu toolchain's own glibc-2.28 stdenv, for
+        # devShells.crypto to point OPENSSL_LIB_DIR/OPENSSL_INCLUDE_DIR at,
+        # instead of nixpkgs' native-stdenv pkgs.openssl_3_5.
+        opensslCrossPackage = builtins.elemAt opensslToolchains.x86_64-gnu.buildInputs 1;
         vmRuntime = pkgs.callPackage ./nix/pkgs/vm-runtime.nix { };
         testGuest = import ./nix/test-guest {
           inherit pkgs;
@@ -210,25 +257,37 @@
         devShells = {
           default = pkgs.mkShellNoCC commonDevShell;
 
-          # Crypto backend tests need native OpenSSL and Cargo's symbol-prefixed
-          # AWS-LC build. The release toolchains expose an unprefixed system
-          # AWS-LC libcrypto/libssl that collides with OpenSSL when both link.
-          crypto = pkgs.mkShell {
-            packages = [
-              rustToolchain
-              pkgs.cmakeMinimal
-              pkgs.pkg-config
-              pkgs.uv
-            ];
-            buildInputs = [ pkgs.openssl_3_5 ];
-            env = {
-              OPENSSL_LIB_DIR = "${pkgs.lib.getLib pkgs.openssl_3_5}/lib";
-              OPENSSL_INCLUDE_DIR = "${pkgs.lib.getDev pkgs.openssl_3_5}/include";
-              OPENSSL_NO_VENDOR = "1";
-              OPENSSL_STATIC = "0";
-              AWS_LC_SYS_USE_SYSTEM = "0";
-            };
-          };
+          # Crypto backend tests need an OpenSSL built against the same
+          # glibc-2.28 stdenv as the rest of the gateway binary (see
+          # nix/pkgs/openssl.nix), not nixpkgs' native-stdenv pkgs.openssl_3_5:
+          # the native build expects glibc symbols (e.g. __isoc23_strtol,
+          # glibc >= 2.38) the project's glibc-2.28 sysroot doesn't provide.
+          # CC/LINKER/AS/AR come from opensslToolchains.x86_64-gnu only: this
+          # shell exists for the gateway's x86_64-unknown-linux-gnu build
+          # (see Dockerfile.gateway.multistage), so unlike commonDevShell's
+          # env (which folds over every `toolchains` entry so any of its
+          # target triples can be cross-built from one shell) this must not
+          # fold over all of `opensslToolchains` too: that would force
+          # realizing every other target's toolchain as well, including a
+          # from-scratch aarch64-gnu cross-GCC with no binary cache hit (this
+          # combination of glibc-2.28 + openssl.nix has never been built
+          # before), just to enter a shell that only ever targets x86_64-gnu.
+          # This target's cross sysroot never bakes in aws-lc.nix's
+          # unprefixed libcrypto/libssl shim (see opensslBuildInputs above),
+          # so linking the real OpenSSL below can't collide with it.
+          crypto = pkgs.mkShell (
+            commonDevShell
+            // {
+              buildInputs = [ opensslCrossPackage ];
+              env = opensslToolchains.x86_64-gnu.env // {
+                OPENSSL_LIB_DIR = "${pkgs.lib.getLib opensslCrossPackage}/lib";
+                OPENSSL_INCLUDE_DIR = "${pkgs.lib.getDev opensslCrossPackage}/include";
+                OPENSSL_NO_VENDOR = "1";
+                OPENSSL_STATIC = "0";
+                AWS_LC_SYS_USE_SYSTEM = "0";
+              };
+            }
+          );
 
           testing = pkgs.mkShellNoCC (
             commonDevShell

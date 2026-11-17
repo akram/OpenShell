@@ -60,31 +60,23 @@ COPY . .
 # (crypto-aws-lc / crypto-openssl), not a Cargo.toml text patch: every crate
 # in the gateway's dependency path forwards whichever one is selected here.
 #
-# The default devShell's release toolchain exposes an unprefixed system
-# AWS-LC libcrypto/libssl shim that silently satisfies most of the `openssl`
-# crate's link requirements but is missing OpenSSL-3-only symbols (e.g.
-# EVP_default_properties_is_fips_enabled). flake.nix's dedicated `crypto`
-# devShell fixes exactly this (OPENSSL_LIB_DIR/OPENSSL_INCLUDE_DIR pointed at
-# a real OpenSSL 3.5, AWS_LC_SYS_USE_SYSTEM=0), but it is a minimal shell for
-# crypto-crate-only tests: it has no z3/aws-lc toolchain wiring and the full
-# gateway binary needs libz3 regardless of crypto backend. So: stay in the
-# default shell (z3, cargo-auditable) and layer the `crypto` shell's env vars
-# on top via `env`, read from the flake itself rather than duplicated here.
+# The default devShell's release toolchain bakes aws-lc.nix straight into its
+# cross sysroot (see flake.nix's `buildInputs`), so it's always on the
+# linker's default search path. That unprefixed system AWS-LC libcrypto/libssl
+# shim silently satisfies most of the `openssl` crate's link requirements, but
+# a handful of OpenSSL-3-only symbols (the ASN1_ITEM accessors among them) are
+# STT_OBJECT there and STT_FUNC in real OpenSSL 3.x, so once the real OpenSSL
+# is also linked in, the mismatched duplicate definitions fail the link.
+# flake.nix's dedicated `crypto` devShell builds its cross sysroots from
+# opensslBuildInputs (z3, no aws-lc.nix) instead, so the only libcrypto/libssl
+# the linker ever sees there is the OpenSSL 3.5 this shell points at.
 ARG CRYPTO_BACKEND=aws-lc
 RUN if [ "${CRYPTO_BACKEND}" = "openssl" ]; then \
-      OPENSSL_LIB_DIR="$(bash -c 'source <(nix print-dev-env .#crypto) >/dev/null 2>&1; printf %s "$OPENSSL_LIB_DIR"')" && \
-      OPENSSL_INCLUDE_DIR="$(bash -c 'source <(nix print-dev-env .#crypto) >/dev/null 2>&1; printf %s "$OPENSSL_INCLUDE_DIR"')" && \
-      test -n "${OPENSSL_LIB_DIR}" && test -n "${OPENSSL_INCLUDE_DIR}" && \
-      nix develop -c env \
-        -u AWS_LC_SYS_SYSTEM_DIR -u AWS_LC_SYS_SYSTEM_DIR_x86_64_unknown_linux_gnu \
-        OPENSSL_LIB_DIR="${OPENSSL_LIB_DIR}" OPENSSL_INCLUDE_DIR="${OPENSSL_INCLUDE_DIR}" \
-        OPENSSL_NO_VENDOR=1 OPENSSL_STATIC=0 AWS_LC_SYS_USE_SYSTEM=0 \
-        bash -euo pipefail -c '\
-          export RUSTFLAGS="-L $OPENSSL_LIB_DIR ${RUSTFLAGS:-}" && \
-          GIT_DIR=/nonexistent cargo auditable build --release \
-            --target x86_64-unknown-linux-gnu \
-            --package openshell-gateway --bin openshell-gateway \
-            --no-default-features --features "telemetry,in-tree-compute-drivers,crypto-openssl"'; \
+      nix develop .#crypto -c bash -euo pipefail -c '\
+        GIT_DIR=/nonexistent cargo auditable build --release \
+          --target x86_64-unknown-linux-gnu \
+          --package openshell-gateway --bin openshell-gateway \
+          --no-default-features --features "telemetry,in-tree-compute-drivers,crypto-openssl"'; \
     else \
       nix develop -c bash -euo pipefail -c '\
         GIT_DIR=/nonexistent cargo auditable build --release \
