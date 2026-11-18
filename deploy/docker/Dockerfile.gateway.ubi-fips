@@ -1,0 +1,60 @@
+# syntax=docker/dockerfile:1.4
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# RHOAIENG-97009: UBI-based variant of Dockerfile.gateway.multistage for the
+# crypto-openssl backend. Builder and runtime share the same UBI9 glibc/OpenSSL
+# base (no cross-compilation, no Nix) so the gateway binary dynamically links
+# against the same system libcrypto/libssl it was built against, matching the
+# "dynamic linking to the intended system OpenSSL and provider package in the
+# supported runtime image" requirement in crates/openshell-crypto/CRYPTO.md.
+#
+# Requires [patch.crates-io] in the workspace Cargo.toml pointing russh/ssh-key
+# at the akram/russh (feat/optional-openssl-gcm-backend) and
+# akram/rust-ssh-key (feat/openssl-rsa-backend) forks.
+
+# ---- Builder: UBI9 + rustup, native build (no cross, no Nix) ----------------
+FROM registry.access.redhat.com/ubi9/ubi:9.6 AS builder
+
+RUN dnf install -y --setopt=install_weak_deps=0 \
+      gcc git pkgconf-pkg-config openssl-devel perl-FindBin perl-File-Compare \
+    && dnf clean all
+
+ENV HOME=/root \
+    PATH=/root/.cargo/bin:${PATH} \
+    CARGO_AUDITABLE_VERSION=0.6.7
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+      sh -s -- -y --default-toolchain stable --profile minimal && \
+    cargo install cargo-auditable --version ${CARGO_AUDITABLE_VERSION} --locked
+
+WORKDIR /build
+COPY . .
+
+# System OpenSSL (openssl-devel, pulled in above) is what openssl-sys links
+# against here and in the runtime stage below; no vendored/static OpenSSL.
+RUN GIT_DIR=/nonexistent cargo auditable build --release \
+      --package openshell-gateway --bin openshell-gateway \
+      --no-default-features --features "telemetry,in-tree-compute-drivers,crypto-openssl" && \
+    cp target/release/openshell-gateway /openshell-gateway && \
+    cd / && rm -rf /build /root/.cargo/registry /root/.cargo/git /root/.cache
+
+# ---- Runtime: UBI9-minimal, FIPS-mode system OpenSSL -------------------------
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6 AS gateway
+
+RUN microdnf install -y --setopt=install_weak_deps=0 \
+      openssl-libs crypto-policies crypto-policies-scripts \
+    && update-crypto-policies --set FIPS \
+    && microdnf clean all
+
+ARG TARGETARCH
+
+WORKDIR /app
+
+COPY --from=builder /openshell-gateway /usr/local/bin/openshell-gateway
+
+USER 1000:1000
+EXPOSE 8080
+
+ENTRYPOINT ["/usr/local/bin/openshell-gateway"]
+CMD ["--bind-address", "0.0.0.0", "--port", "8080"]
