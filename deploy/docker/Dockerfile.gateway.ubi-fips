@@ -80,9 +80,14 @@ RUN microdnf install -y --setopt=install_weak_deps=0 \
 ARG TARGETARCH
 
 WORKDIR /app
+RUN chown 1000:1000 /app
 
 COPY --from=builder /openshell-gateway /usr/local/bin/openshell-gateway
 
+# Unlike distroless:nonroot, UBI9-minimal has no HOME set for uid 1000 by
+# default; the gateway's state dir resolves under $HOME and fails to create
+# ("Permission denied") without this.
+ENV HOME=/app
 USER 1000:1000
 EXPOSE 8080
 

@@ -16,6 +16,8 @@ RUN microdnf install -y --setopt=install_weak_deps=0 libstdc++ \
     && microdnf install -y --setopt=install_weak_deps=0 z3-libs \
     && rpm -e epel-release \
     && rm -f /tmp/epel.rpm \
-    && microdnf clean all
+    && microdnf clean all \
+    && mkdir -p /app && chown 1000:1000 /app
 
+ENV HOME=/app
 USER 1000:1000
