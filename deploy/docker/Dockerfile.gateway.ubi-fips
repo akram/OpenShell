@@ -23,7 +23,7 @@
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6 AS builder
 
 RUN microdnf install -y --setopt=install_weak_deps=0 \
-      gcc git pkgconf-pkg-config openssl-devel tar curl ca-certificates \
+      gcc git pkgconf-pkg-config openssl-devel tar ca-certificates \
     && microdnf clean all
 
 ENV HOME=/root \
