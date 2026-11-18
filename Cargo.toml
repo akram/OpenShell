@@ -201,4 +201,4 @@ opt-level = 3
 # rebased on that exact upstream tag.
 [patch.crates-io]
 russh = { git = "https://github.com/akram/russh", branch = "feat/optional-openssl-gcm-backend" }
-ssh-key = { git = "https://github.com/akram/rust-ssh-key", branch = "feat/openssl-rsa-backend" }
+ssh-key = { git = "https://github.com/akram/rust-ssh-key", branch = "feat/openssl-pkcs8-and-keygen" }
