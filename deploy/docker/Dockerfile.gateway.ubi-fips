@@ -13,12 +13,18 @@
 # at the akram/russh (feat/optional-openssl-gcm-backend) and
 # akram/rust-ssh-key (feat/openssl-rsa-backend) forks.
 
-# ---- Builder: UBI9 + rustup, native build (no cross, no Nix) ----------------
-FROM registry.access.redhat.com/ubi9/ubi:9.6 AS builder
+# ---- Builder: UBI9-minimal + rustup, native build (no cross, no Nix) --------
+#
+# ubi9/ubi (the full image) ships shadow-utils' newuidmap/newgidmap with a
+# security.capability xattr baked into its layer; Kaniko's unprivileged
+# executor can't re-apply that xattr while unpacking the base image
+# ("lsetxattr ... operation not permitted"). ubi9/ubi-minimal doesn't carry
+# those binaries, so it unpacks cleanly under the same unprivileged SCC.
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6 AS builder
 
-RUN dnf install -y --setopt=install_weak_deps=0 \
-      gcc git pkgconf-pkg-config openssl-devel perl-FindBin perl-File-Compare \
-    && dnf clean all
+RUN microdnf install -y --setopt=install_weak_deps=0 \
+      gcc git pkgconf-pkg-config openssl-devel tar curl ca-certificates \
+    && microdnf clean all
 
 ENV HOME=/root \
     PATH=/root/.cargo/bin:${PATH} \
