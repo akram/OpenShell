@@ -23,7 +23,13 @@
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6 AS builder
 
 RUN microdnf install -y --setopt=install_weak_deps=0 \
-      gcc gcc-c++ git pkgconf-pkg-config openssl-devel z3-devel tar ca-certificates \
+      gcc git pkgconf-pkg-config openssl-devel tar ca-certificates \
+    && microdnf clean all
+
+# z3 (openshell-prover) links -lz3, and z3's C++ bindings need libstdc++
+# (-lstdc++) at final link time; neither comes with the base gcc install.
+RUN microdnf install -y --setopt=install_weak_deps=0 \
+      gcc-c++ z3-devel \
     && microdnf clean all
 
 ENV HOME=/root \
