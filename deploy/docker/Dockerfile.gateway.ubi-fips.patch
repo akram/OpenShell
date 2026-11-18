@@ -1,0 +1,21 @@
+# syntax=docker/dockerfile:1.4
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Temporary patch for the already-built openshell-gateway:ubi-fips image
+# (pinned by digest, from before the runtime libz3/libstdc++ fix): adds the
+# missing shared libs without recompiling the Rust binary. Delete this file
+# once Dockerfile.gateway.ubi-fips has been rebuilt clean and verified.
+FROM image-registry.openshift-image-registry.svc:5000/openshell-images/openshell-gateway@sha256:5698fe5061ef95616c337f3ea7af33bbec1fd0997e9fb91fc9713dc575211582
+
+USER 0
+
+RUN microdnf install -y --setopt=install_weak_deps=0 libstdc++ \
+    && curl -sSL -o /tmp/epel.rpm https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm \
+    && rpm -ivh /tmp/epel.rpm \
+    && microdnf install -y --setopt=install_weak_deps=0 z3-libs \
+    && rpm -e epel-release \
+    && rm -f /tmp/epel.rpm \
+    && microdnf clean all
+
+USER 1000:1000
