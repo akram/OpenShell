@@ -26,10 +26,14 @@ RUN microdnf install -y --setopt=install_weak_deps=0 \
       gcc git pkgconf-pkg-config openssl-devel tar ca-certificates \
     && microdnf clean all
 
-# z3 (openshell-prover) links -lz3, and z3's C++ bindings need libstdc++
-# (-lstdc++) at final link time; neither comes with the base gcc install.
+# z3's C++ bindings need libstdc++ (-lstdc++) at final link time; the base
+# gcc install doesn't carry it. z3-devel itself (-lz3 + headers) isn't
+# packaged in UBI9's baseos/appstream/CRB repos (EPEL-only), so the cargo
+# build below pulls a prebuilt libz3 from GitHub releases instead
+# (openshell-server's prebuilt-z3 feature -> z3/gh-release) rather than
+# reaching for an unofficial, unsupported repo.
 RUN microdnf install -y --setopt=install_weak_deps=0 \
-      gcc-c++ z3-devel \
+      gcc-c++ \
     && microdnf clean all
 
 ENV HOME=/root \
@@ -47,7 +51,8 @@ COPY . .
 # against here and in the runtime stage below; no vendored/static OpenSSL.
 RUN GIT_DIR=/nonexistent cargo auditable build --release \
       --package openshell-gateway --bin openshell-gateway \
-      --no-default-features --features "telemetry,in-tree-compute-drivers,crypto-openssl" && \
+      --no-default-features \
+      --features "telemetry,in-tree-compute-drivers,crypto-openssl,openshell-server/prebuilt-z3" && \
     cp target/release/openshell-gateway /openshell-gateway && \
     cd / && rm -rf /build /root/.cargo/registry /root/.cargo/git /root/.cache
 
