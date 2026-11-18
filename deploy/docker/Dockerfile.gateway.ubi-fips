@@ -28,12 +28,21 @@ RUN microdnf install -y --setopt=install_weak_deps=0 \
 
 # z3's C++ bindings need libstdc++ (-lstdc++) at final link time; the base
 # gcc install doesn't carry it. z3-devel itself (-lz3 + headers) isn't
-# packaged in UBI9's baseos/appstream/CRB repos (EPEL-only), so the cargo
-# build below pulls a prebuilt libz3 from GitHub releases instead
-# (openshell-server's prebuilt-z3 feature -> z3/gh-release) rather than
-# reaching for an unofficial, unsupported repo.
-RUN microdnf install -y --setopt=install_weak_deps=0 \
-      gcc-c++ \
+# packaged in UBI9's baseos/appstream/CRB repos (EPEL-only).
+#
+# TODO(RHOAIENG-97009): this pulls z3-devel from EPEL9, an unofficial,
+# non-Red-Hat-supported repo -- fine for this feasibility build, but a
+# FIPS-certifiable final image should instead use z3/vendored (build z3
+# from source against the same toolchain) or an officially supported
+# package. The GitHub-releases prebuilt-z3 feature was tried first but its
+# libz3 archive is linked against a newer glibc/libstdc++ ABI than UBI9
+# ships (undefined __isoc23_* / std::to_chars symbols at link time).
+RUN microdnf install -y --setopt=install_weak_deps=0 gcc-c++ \
+    && curl -sSL -o /tmp/epel.rpm https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm \
+    && rpm -ivh /tmp/epel.rpm \
+    && microdnf install -y --setopt=install_weak_deps=0 z3-devel \
+    && rpm -e epel-release \
+    && rm -f /tmp/epel.rpm \
     && microdnf clean all
 
 ENV HOME=/root \
@@ -51,8 +60,7 @@ COPY . .
 # against here and in the runtime stage below; no vendored/static OpenSSL.
 RUN GIT_DIR=/nonexistent cargo auditable build --release \
       --package openshell-gateway --bin openshell-gateway \
-      --no-default-features \
-      --features "telemetry,in-tree-compute-drivers,crypto-openssl,openshell-server/prebuilt-z3" && \
+      --no-default-features --features "telemetry,in-tree-compute-drivers,crypto-openssl" && \
     cp target/release/openshell-gateway /openshell-gateway && \
     cd / && rm -rf /build /root/.cargo/registry /root/.cargo/git /root/.cache
 
