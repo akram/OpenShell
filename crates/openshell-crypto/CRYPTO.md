@@ -176,27 +176,32 @@ dependency only the *other* binary requests, confirmed absent from both the
 For `openshell-gateway` built with `crypto-openssl`, as of this investigation:
 - **Confirmed false positives** (absent from the build log's `Compiling ...`
   lines, hence not actually linked): `ed25519-dalek`, `curve25519-dalek`,
-  `ring`. All three are pulled into the shared `Cargo.lock` only by
-  `openshell-supervisor-process`'s unconditional `russh = "0.65.0"` (default
-  `aws-lc-rs` backend, no `crypto-openssl` equivalent of
-  `openshell-gateway`'s wiring exists there yet). `ed25519-dalek` and
-  `curve25519-dalek` were real findings earlier in this investigation and
-  became false positives for `openshell-gateway` specifically once russh's
-  PKCS8 parsing/encoding and X25519 KEX (`kex/x25519.rs`) grew OpenSSL
-  backends and those two crates became true optional dependencies. Migrating
-  `openshell-supervisor` to the same `crypto-openssl`/`crypto-aws-lc` pattern
-  as `openshell-gateway` would remove this cross-contamination entirely, in
-  addition to being its own separate FIPS work for that binary -- deferred,
-  not done as part of this investigation.
+  `p256`, `p384`, `p521`, `ecdsa`, `elliptic-curve`, `ring`. All are pulled
+  into the shared `Cargo.lock` only by `openshell-supervisor-process`'s
+  unconditional `russh = "0.65.0"` (default `aws-lc-rs` backend, no
+  `crypto-openssl` equivalent of `openshell-gateway`'s wiring exists there
+  yet). Every one of these was a real finding earlier in this investigation
+  and became a false positive for `openshell-gateway` specifically once
+  russh's PKCS8 parsing/encoding, X25519 KEX (`kex/x25519.rs`), and
+  NIST-curve KEX (`kex/ecdh_nistp.rs`: `ecdh-sha2-nistp256/384/521`) all
+  grew OpenSSL backends and those crates became true optional dependencies.
+  Migrating `openshell-supervisor` to the same `crypto-openssl`/
+  `crypto-aws-lc` pattern as `openshell-gateway` would remove this
+  cross-contamination entirely, in addition to being its own separate FIPS
+  work for that binary -- deferred, not done as part of this investigation.
 - **Confirmed real** (present in the build log, genuinely linked):
-  `aes`, `aes-gcm`, `aws-lc-rs`, `aws-lc-sys`, `cbc`, `ctr`, `ecdsa`, `hmac`,
-  `md-5`, `p256`, `p384`, `p521`, `rsa`, `sha1`, `sha2`, `sha3`.
-  `aws-lc-rs`/`aws-lc-sys` come from `spiffe/jwt-verify-aws-lc-rs`, `kube`'s
-  `rustls-tls` (which couples to `aws-lc-rs` internally), and `sqlx`'s
-  `_tls-rustls-aws-lc-rs` -- all independent of `russh`/`ssh-key`.
-  `p256`/`p384`/`p521`/`ecdsa` come from `russh`'s NIST-curve key exchange
-  (`kex/ecdh_nistp.rs`: `ecdh-sha2-nistp256/384/521`), which has no OpenSSL
-  backend yet.
+  `aes`, `aes-gcm`, `aws-lc-rs`, `aws-lc-sys`, `cbc`, `ctr`, `hmac`, `md-5`,
+  `rsa`, `sha1`, `sha2`, `sha3`. `aws-lc-rs`/`aws-lc-sys` come from
+  `spiffe/jwt-verify-aws-lc-rs`, `kube`'s `rustls-tls` (which couples to
+  `aws-lc-rs` internally), and `sqlx`'s `_tls-rustls-aws-lc-rs` -- all
+  independent of `russh`/`ssh-key`. `md-5` comes from `sqlx-postgres`
+  (PostgreSQL wire-protocol MD5 auth), also independent. `aes`/`aes-gcm`/
+  `cbc` come via `pkcs5`'s PBES2 (password-protected PKCS#8 file
+  encryption, `encode_pkcs8_encrypted`), a different code path from the
+  `aes*-gcm@openssh.com` SSH wire cipher that already has an OpenSSL
+  backend. `rsa` is still a direct dependency of both `russh` and
+  `ssh-key`: RSA signing goes through OpenSSL, but PKCS#1 component
+  parsing/storage for `RsaKeypair` does not yet.
 
 To check whether a given crate is genuinely compiled into `openshell-gateway`
 rather than an artifact of this scoping gap, cross-reference the Kaniko/cargo
