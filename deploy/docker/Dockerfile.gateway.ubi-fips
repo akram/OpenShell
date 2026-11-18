@@ -68,8 +68,13 @@ RUN GIT_DIR=/nonexistent cargo auditable build --release \
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6 AS gateway
 
 RUN microdnf install -y --setopt=install_weak_deps=0 \
-      openssl-libs crypto-policies crypto-policies-scripts \
+      openssl-libs crypto-policies crypto-policies-scripts libstdc++ \
     && update-crypto-policies --set FIPS \
+    && curl -sSL -o /tmp/epel.rpm https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm \
+    && rpm -ivh /tmp/epel.rpm \
+    && microdnf install -y --setopt=install_weak_deps=0 z3-libs \
+    && rpm -e epel-release \
+    && rm -f /tmp/epel.rpm \
     && microdnf clean all
 
 ARG TARGETARCH
