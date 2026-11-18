@@ -175,23 +175,28 @@ dependency only the *other* binary requests, confirmed absent from both the
 
 For `openshell-gateway` built with `crypto-openssl`, as of this investigation:
 - **Confirmed false positives** (absent from the build log's `Compiling ...`
-  lines, hence not actually linked): `ed25519-dalek`, `ring`. Both are pulled
-  into the shared `Cargo.lock` only by `openshell-supervisor-process`'s
-  unconditional `russh = "0.65.0"` (default `aws-lc-rs` backend, no
-  `crypto-openssl` equivalent of `openshell-gateway`'s wiring exists there
-  yet). Migrating `openshell-supervisor` to the same `crypto-openssl`/
-  `crypto-aws-lc` pattern as `openshell-gateway` would remove this
-  cross-contamination, in addition to being its own separate FIPS work for
-  that binary -- deferred, not done as part of this investigation.
+  lines, hence not actually linked): `ed25519-dalek`, `curve25519-dalek`,
+  `ring`. All three are pulled into the shared `Cargo.lock` only by
+  `openshell-supervisor-process`'s unconditional `russh = "0.65.0"` (default
+  `aws-lc-rs` backend, no `crypto-openssl` equivalent of
+  `openshell-gateway`'s wiring exists there yet). `ed25519-dalek` and
+  `curve25519-dalek` were real findings earlier in this investigation and
+  became false positives for `openshell-gateway` specifically once russh's
+  PKCS8 parsing/encoding and X25519 KEX (`kex/x25519.rs`) grew OpenSSL
+  backends and those two crates became true optional dependencies. Migrating
+  `openshell-supervisor` to the same `crypto-openssl`/`crypto-aws-lc` pattern
+  as `openshell-gateway` would remove this cross-contamination entirely, in
+  addition to being its own separate FIPS work for that binary -- deferred,
+  not done as part of this investigation.
 - **Confirmed real** (present in the build log, genuinely linked):
-  `aes`, `aes-gcm`, `aws-lc-rs`, `aws-lc-sys`, `cbc`, `ctr`,
-  `curve25519-dalek`, `ecdsa`, `hmac`, `md-5`, `p256`, `p384`, `p521`, `rsa`,
-  `sha1`, `sha2`, `sha3`. `aws-lc-rs`/`aws-lc-sys` come from
-  `spiffe/jwt-verify-aws-lc-rs`, `kube`'s `rustls-tls` (which couples to
-  `aws-lc-rs` internally), and `sqlx`'s `_tls-rustls-aws-lc-rs` -- all
-  independent of `russh`/`ssh-key`. `curve25519-dalek`/`p256`/`p384`/`p521`/
-  `ecdsa` come from `russh`'s key exchange (`kex/curve25519.rs`,
-  `kex/ecdh_nistp.rs`), which has no OpenSSL backend yet.
+  `aes`, `aes-gcm`, `aws-lc-rs`, `aws-lc-sys`, `cbc`, `ctr`, `ecdsa`, `hmac`,
+  `md-5`, `p256`, `p384`, `p521`, `rsa`, `sha1`, `sha2`, `sha3`.
+  `aws-lc-rs`/`aws-lc-sys` come from `spiffe/jwt-verify-aws-lc-rs`, `kube`'s
+  `rustls-tls` (which couples to `aws-lc-rs` internally), and `sqlx`'s
+  `_tls-rustls-aws-lc-rs` -- all independent of `russh`/`ssh-key`.
+  `p256`/`p384`/`p521`/`ecdsa` come from `russh`'s NIST-curve key exchange
+  (`kex/ecdh_nistp.rs`: `ecdh-sha2-nistp256/384/521`), which has no OpenSSL
+  backend yet.
 
 To check whether a given crate is genuinely compiled into `openshell-gateway`
 rather than an artifact of this scoping gap, cross-reference the Kaniko/cargo
