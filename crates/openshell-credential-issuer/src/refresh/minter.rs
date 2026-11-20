@@ -261,6 +261,7 @@ pub trait TokenMinter: Send + Sync {
 struct OAuth2RefreshToken;
 struct OAuth2ClientCredentials;
 struct GoogleServiceAccountJwt;
+#[cfg(feature = "aws-sts")]
 struct AwsStsAssumeRole;
 
 #[async_trait]
@@ -284,6 +285,7 @@ impl TokenMinter for GoogleServiceAccountJwt {
     }
 }
 
+#[cfg(feature = "aws-sts")]
 #[async_trait]
 impl TokenMinter for AwsStsAssumeRole {
     async fn mint(&self, request: &MintRequest) -> Result<MintedCredential, RefreshFailure> {
@@ -293,15 +295,28 @@ impl TokenMinter for AwsStsAssumeRole {
 
 /// Immutable built-in-only registry. There is deliberately no registration API.
 pub struct BuiltInMinterRegistry {
-    entries: [(&'static str, &'static dyn TokenMinter); 4],
+    entries: &'static [(&'static str, &'static dyn TokenMinter)],
 }
 
+// `aws_sts_assume_role` stays a valid wire value either way (it is a
+// protobuf enum variant); without `aws-sts` it is simply absent from this
+// registry, so `mint_credential` falls through to its existing "cannot be
+// minted by the gateway" error instead of pulling aws-config/aws-sdk-sts.
+#[cfg(feature = "aws-sts")]
 static BUILT_IN_MINTERS: BuiltInMinterRegistry = BuiltInMinterRegistry {
-    entries: [
+    entries: &[
         ("oauth2_refresh_token", &OAuth2RefreshToken),
         ("oauth2_client_credentials", &OAuth2ClientCredentials),
         ("google_service_account_jwt", &GoogleServiceAccountJwt),
         ("aws_sts_assume_role", &AwsStsAssumeRole),
+    ],
+};
+#[cfg(not(feature = "aws-sts"))]
+static BUILT_IN_MINTERS: BuiltInMinterRegistry = BuiltInMinterRegistry {
+    entries: &[
+        ("oauth2_refresh_token", &OAuth2RefreshToken),
+        ("oauth2_client_credentials", &OAuth2ClientCredentials),
+        ("google_service_account_jwt", &GoogleServiceAccountJwt),
     ],
 };
 
@@ -444,6 +459,7 @@ async fn mint_google_service_account_jwt(
     .await
 }
 
+#[cfg(feature = "aws-sts")]
 async fn mint_aws_sts_assume_role(state: &MintRequest) -> Result<MintedCredential, RefreshFailure> {
     let role_arn = required_material(&state.material, "role_arn")?;
     let session_name = material_value(&state.material, &["session_name"])
@@ -893,7 +909,7 @@ fn is_loopback_host(host: &str) -> bool {
 /// mock STS. Available only in tests or explicit test-support builds; release
 /// defaults cannot enable the override through request material. The configure
 /// boundary also rejects the `sts_endpoint_url` material key.
-#[cfg(any(test, feature = "test-support"))]
+#[cfg(all(feature = "aws-sts", any(test, feature = "test-support")))]
 fn test_sts_endpoint_override(state: &MintRequest) -> Option<String> {
     material_value(&state.material, &["sts_endpoint_url"]).filter(|endpoint| {
         reqwest::Url::parse(endpoint)
@@ -903,7 +919,7 @@ fn test_sts_endpoint_override(state: &MintRequest) -> Option<String> {
     })
 }
 
-#[cfg(not(any(test, feature = "test-support")))]
+#[cfg(all(feature = "aws-sts", not(any(test, feature = "test-support"))))]
 #[allow(clippy::missing_const_for_fn)]
 fn test_sts_endpoint_override(_state: &MintRequest) -> Option<String> {
     None
@@ -919,6 +935,7 @@ mod tests {
         prost_types::Duration { seconds, nanos: 0 }
     }
 
+    #[cfg(feature = "aws-sts")]
     #[test]
     fn built_in_registry_contains_exactly_four_canonical_strategies() {
         let registry = built_in_minters();
@@ -946,6 +963,37 @@ mod tests {
         }
         assert!(registry.lookup("OAUTH2_REFRESH_TOKEN").is_none());
         assert!(registry.lookup("custom").is_none());
+    }
+
+    /// Without `aws-sts`, `aws_sts_assume_role` is still a valid strategy on
+    /// the wire, but the gateway cannot mint it: no aws-config/aws-sdk-sts
+    /// dependency, no silent fallback.
+    #[cfg(not(feature = "aws-sts"))]
+    #[tokio::test]
+    async fn aws_sts_assume_role_fails_cleanly_without_aws_sts_feature() {
+        let registry = built_in_minters();
+        assert_eq!(
+            registry.strategy_names().collect::<Vec<_>>(),
+            [
+                "oauth2_refresh_token",
+                "oauth2_client_credentials",
+                "google_service_account_jwt",
+            ]
+        );
+        assert!(!registry.can_mint(ProviderCredentialRefreshStrategy::AwsStsAssumeRole as i32));
+
+        let failure = mint_credential(&MintRequest {
+            strategy: ProviderCredentialRefreshStrategy::AwsStsAssumeRole as i32,
+            ..Default::default()
+        })
+        .await
+        .err()
+        .expect("aws_sts_assume_role must not mint without the aws-sts feature");
+        assert_eq!(failure.status.code(), Code::FailedPrecondition);
+        assert_eq!(
+            failure.status.message(),
+            "refresh strategy 'AwsStsAssumeRole' cannot be minted by the gateway"
+        );
     }
 
     #[tokio::test]
@@ -1260,6 +1308,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "aws-sts")]
     #[test]
     fn aws_sts_max_expires_saturates_on_saturated_clock() {
         assert_eq!(i64::MAX.saturating_add(3_600_000), i64::MAX);
@@ -1269,6 +1318,7 @@ mod tests {
         assert_eq!(max_expires, i64::MAX);
         assert!(max_expires >= now_ms);
     }
+    #[cfg(feature = "aws-sts")]
     #[tokio::test]
     async fn aws_sts_mint_writes_to_resolved_additional_output_keys() {
         let mock_server = MockServer::start().await;
@@ -1336,6 +1386,7 @@ mod tests {
         assert!(minted.expires_at_ms <= current_time_ms().saturating_add(3_600_000));
     }
 
+    #[cfg(feature = "aws-sts")]
     #[tokio::test]
     async fn aws_sts_mint_rejects_partial_source_credentials() {
         let state = MintRequest {
@@ -1371,6 +1422,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "aws-sts")]
     #[tokio::test]
     async fn aws_sts_mint_accepts_session_token_with_source_pair() {
         let mock_server = MockServer::start().await;
@@ -1425,6 +1477,7 @@ mod tests {
         assert_eq!(minted.access_token, "ASIAMOCKKEY");
     }
 
+    #[cfg(feature = "aws-sts")]
     #[tokio::test]
     async fn aws_sts_mint_rejects_session_token_without_source_pair() {
         let state = MintRequest {
@@ -1463,6 +1516,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "aws-sts")]
     #[test]
     fn test_sts_endpoint_override_accepts_only_loopback_hosts() {
         for endpoint in ["http://127.0.0.1:1234", "http://localhost:1234"] {

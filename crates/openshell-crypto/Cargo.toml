@@ -14,18 +14,23 @@ repository.workspace = true
 # Only this feature selects the default backend. With defaults disabled an
 # embedder must install its backend before any crypto operation.
 default = ["aws-lc"]
-aws-lc = ["dep:aws-lc-rs", "rustls/aws_lc_rs", "rcgen/aws_lc_rs", "jsonwebtoken/aws_lc_rs", "tonic?/tls-aws-lc", "kube?/aws-lc-rs", "sqlx?/tls-rustls-aws-lc-rs"]
+aws-lc = ["dep:aws-lc-rs", "rustls/aws_lc_rs", "rcgen/aws_lc_rs", "jsonwebtoken/aws_lc_rs", "tonic?/tls-aws-lc", "kube?/aws-lc-rs", "kube?/rustls-tls", "sqlx?/tls-rustls-aws-lc-rs", "reqwest?/rustls-tls-native-roots-no-provider"]
 # Makes OpenSsl available for explicit context selection; does not change defaults.
-openssl = ["dep:openssl", "dep:rustls-openssl", "dep:jsonwebtoken-openssl", "dep:zeroize"]
+# Also routes the dependency-owned TLS clients that have an OpenSSL-linked
+# build upstream (kube-client, reqwest) through it instead of their
+# rustls/aws-lc-rs defaults.
+openssl = ["dep:openssl", "dep:rustls-openssl", "dep:jsonwebtoken-openssl", "dep:zeroize", "kube?/openssl-tls", "reqwest?/native-tls"]
 tls-tonic = ["dep:tonic"]
 tls-kube = ["dep:kube", "dep:k8s-openapi"]
 tls-sqlx = ["dep:sqlx"]
+tls-reqwest = ["dep:reqwest"]
 
 [dependencies]
 tonic = { workspace = true, optional = true }
 kube = { workspace = true, optional = true }
 k8s-openapi = { workspace = true, optional = true }
 sqlx = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
 
 aws-lc-rs = { workspace = true, optional = true }
 openssl = { version = "0.10.79", default-features = false, optional = true }

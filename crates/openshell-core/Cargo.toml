@@ -11,7 +11,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-openshell-crypto = { workspace = true, features = ["tls-tonic"] }
+openshell-crypto = { workspace = true, features = ["tls-tonic", "tls-reqwest"] }
 async-trait = "0.1"
 openshell-extension-core = { path = "../openshell-extension-core" }
 openshell-policy-schema = { path = "../openshell-policy-schema" }
@@ -37,7 +37,7 @@ base64 = { workspace = true }
 jsonwebtoken = { workspace = true, optional = true }
 zeroize = { workspace = true, optional = true }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"], optional = true }
-reqwest = { workspace = true, features = ["blocking", "rustls-tls-native-roots-no-provider"], optional = true }
+reqwest = { workspace = true, features = ["blocking"], optional = true }
 tar = { version = "0.4", optional = true }
 tempfile = { version = "3", optional = true }
 openshell-otel = { path = "../openshell-otel", optional = true }

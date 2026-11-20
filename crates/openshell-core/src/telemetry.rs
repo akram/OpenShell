@@ -430,9 +430,11 @@ fn telemetry_worker(rx: mpsc::Receiver<TelemetryEvent>) {
 
 #[cfg(feature = "telemetry")]
 fn publish_payload(endpoint: &str, payload: Value) -> Result<(), reqwest::Error> {
+    // Exactly one TLS backend (rustls or native-tls/OpenSSL) is ever compiled
+    // in, selected by openshell-crypto's `aws-lc`/`openssl` features, so the
+    // builder picks it up without an explicit `.use_*_tls()` call.
     openshell_crypto::tls::ensure_default_provider();
     Client::builder()
-        .use_rustls_tls()
         .tls_built_in_root_certs(true)
         .timeout(HTTP_TIMEOUT)
         .build()?

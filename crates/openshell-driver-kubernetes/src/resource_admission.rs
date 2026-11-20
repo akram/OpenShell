@@ -59,6 +59,11 @@ fn metadata_lookup_error(error: kube::Error, resource: &str) -> Status {
             "Kubernetes API returned {} ({}) while reading metadata for {resource}",
             response.code, response.reason
         )),
+        #[cfg(feature = "openssl")]
+        kube::Error::OpensslTls(_) | kube::Error::TlsRequired => Status::unavailable(format!(
+            "Kubernetes API TLS failed while reading metadata for {resource}"
+        )),
+        #[cfg(not(feature = "openssl"))]
         kube::Error::RustlsTls(_) | kube::Error::TlsRequired => Status::unavailable(format!(
             "Kubernetes API TLS failed while reading metadata for {resource}"
         )),

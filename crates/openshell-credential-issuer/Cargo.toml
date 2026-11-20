@@ -17,8 +17,8 @@ openshell-driver-db-credstore = { path = "../openshell-driver-db-credstore" }
 openshell-driver-kubernetes-secrets = { path = "../openshell-driver-kubernetes-secrets" }
 openshell-driver-vault = { path = "../openshell-driver-vault" }
 async-trait = "0.1"
-aws-config = { workspace = true }
-aws-sdk-sts = { workspace = true }
+aws-config = { workspace = true, optional = true }
+aws-sdk-sts = { workspace = true, optional = true }
 jsonwebtoken = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
@@ -36,8 +36,16 @@ tracing = { workspace = true }
 
 [features]
 test-support = []
+## Enables the `aws_sts_assume_role` credential-refresh strategy. Pulls in
+## aws-config/aws-sdk-sts, which depend on aws-lc-rs with no OpenSSL option
+## upstream (RHOAIENG-97009) -- omitted from the `openssl` backend below.
+## With this feature disabled, that strategy is still a valid value on the
+## wire (it is a protobuf enum variant) but minting it fails cleanly with
+## "refresh strategy 'AwsStsAssumeRole' cannot be minted by the gateway"
+## instead of pulling the dependency.
+aws-sts = ["dep:aws-config", "dep:aws-sdk-sts"]
 ## Forward the host binary's crypto backend selection to the storage drivers.
-aws-lc = ["openshell-driver-vault/aws-lc", "openshell-driver-kubernetes-secrets/aws-lc"]
+aws-lc = ["openshell-driver-vault/aws-lc", "openshell-driver-kubernetes-secrets/aws-lc", "aws-sts"]
 openssl = ["openshell-driver-vault/openssl", "openshell-driver-kubernetes-secrets/openssl"]
 
 [dev-dependencies]
