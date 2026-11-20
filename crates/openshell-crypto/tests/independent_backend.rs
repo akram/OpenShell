@@ -71,6 +71,9 @@ impl CryptoBackend for Backend {
     fn sha256_digest(&self) -> Result<Box<dyn Digest>, CryptoError> {
         Ok(Box::new(TestDigest([0; 32])))
     }
+    fn hmac_sha256(&self, _: &[u8], _: &[u8]) -> Result<[u8; 32], CryptoError> {
+        Err(CryptoError::Operation)
+    }
     fn seal(
         &self,
         key: &[u8; 32],

@@ -21,7 +21,6 @@ use k8s_openapi::api::{
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::api::{Api, PostParams};
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -372,9 +371,10 @@ impl GatewayPeerIdentityResolver for CachingGatewayPeerResolver {
 
 /// Hashed so long-lived map keys never hold raw credentials.
 fn token_cache_key(token: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(token.as_bytes());
-    hex::encode(hasher.finalize())
+    hex::encode(
+        openshell_crypto::sha256(token.as_bytes())
+            .expect("sha256 digest is infallible with a correctly installed backend"),
+    )
 }
 
 /// Reads `exp` from the JWT payload without verifying the signature —

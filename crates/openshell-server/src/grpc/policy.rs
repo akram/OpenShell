@@ -105,7 +105,6 @@ use openshell_prover::{
     report::finding_shorthand,
 };
 use prost::Message;
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -734,12 +733,20 @@ fn compute_proposal_review_token(
     candidate_effective_policy: &ProtoSandboxPolicy,
     credentials: &CredentialSet,
 ) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(b"openshell-proposal-evaluator-v3\0");
-    hasher.update(rule_name.as_bytes());
-    hasher.update(canonical_rule_bytes(rule));
-    hasher.update(deterministic_policy_hash(current_effective_policy).as_bytes());
-    hasher.update(deterministic_policy_hash(candidate_effective_policy).as_bytes());
+    let mut hasher = openshell_crypto::sha256_digest().expect("sha256 digest is available");
+    hasher
+        .update(b"openshell-proposal-evaluator-v3\0")
+        .expect("sha256 update");
+    hasher.update(rule_name.as_bytes()).expect("sha256 update");
+    hasher
+        .update(&canonical_rule_bytes(rule))
+        .expect("sha256 update");
+    hasher
+        .update(deterministic_policy_hash(current_effective_policy).as_bytes())
+        .expect("sha256 update");
+    hasher
+        .update(deterministic_policy_hash(candidate_effective_policy).as_bytes())
+        .expect("sha256 update");
 
     let mut credential_fingerprints = credentials
         .credentials
@@ -761,9 +768,11 @@ fn compute_proposal_review_token(
         .collect::<Vec<_>>();
     credential_fingerprints.sort();
     for fingerprint in credential_fingerprints {
-        hasher.update(fingerprint.as_bytes());
+        hasher
+            .update(fingerprint.as_bytes())
+            .expect("sha256 update");
     }
-    hex::encode(hasher.finalize())
+    hex::encode(hasher.finish().expect("sha256 finish"))
 }
 
 fn compute_failed_proposal_evaluation_hash(
@@ -772,13 +781,21 @@ fn compute_failed_proposal_evaluation_hash(
     current_effective_policy: &ProtoSandboxPolicy,
     application_error: &str,
 ) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(b"openshell-proposal-evaluator-v3-failed\0");
-    hasher.update(rule_name.as_bytes());
-    hasher.update(canonical_rule_bytes(rule));
-    hasher.update(deterministic_policy_hash(current_effective_policy).as_bytes());
-    hasher.update(application_error.as_bytes());
-    hex::encode(hasher.finalize())
+    let mut hasher = openshell_crypto::sha256_digest().expect("sha256 digest is available");
+    hasher
+        .update(b"openshell-proposal-evaluator-v3-failed\0")
+        .expect("sha256 update");
+    hasher.update(rule_name.as_bytes()).expect("sha256 update");
+    hasher
+        .update(&canonical_rule_bytes(rule))
+        .expect("sha256 update");
+    hasher
+        .update(deterministic_policy_hash(current_effective_policy).as_bytes())
+        .expect("sha256 update");
+    hasher
+        .update(application_error.as_bytes())
+        .expect("sha256 update");
+    hex::encode(hasher.finish().expect("sha256 finish"))
 }
 
 fn available_proposal_rule_name(
@@ -3310,11 +3327,16 @@ async fn compute_provider_env_revision_with_catalog_and_policy_bindings(
     provider_names: &[String],
     policy_bindings: &HashMap<String, Vec<StaticCredentialEndpointBinding>>,
 ) -> Result<u64, Status> {
-    let mut hasher = Sha256::new();
-    hasher.update(b"openshell-provider-env-revision-v4");
+    let crypto_err = |_| Status::internal("provider env revision hash failed");
+    let mut hasher = openshell_crypto::sha256_digest().map_err(crypto_err)?;
+    hasher
+        .update(b"openshell-provider-env-revision-v4")
+        .map_err(crypto_err)?;
 
     for provider_name in provider_names {
-        hasher.update(provider_name.as_bytes());
+        hasher
+            .update(provider_name.as_bytes())
+            .map_err(crypto_err)?;
         match store
             .get_by_name(Provider::object_type(), workspace, provider_name)
             .await
@@ -3322,8 +3344,10 @@ async fn compute_provider_env_revision_with_catalog_and_policy_bindings(
                 Status::internal(format!("fetch provider '{provider_name}' failed: {e}"))
             })? {
             Some(record) => {
-                hasher.update(record.id.as_bytes());
-                hasher.update(record.resource_version.to_le_bytes());
+                hasher.update(record.id.as_bytes()).map_err(crypto_err)?;
+                hasher
+                    .update(&record.resource_version.to_le_bytes())
+                    .map_err(crypto_err)?;
 
                 let provider = Provider::decode(record.payload.as_slice()).map_err(|e| {
                     Status::internal(format!("decode provider '{provider_name}' failed: {e}"))
@@ -3334,38 +3358,44 @@ async fn compute_provider_env_revision_with_catalog_and_policy_bindings(
                     .iter()
                     .map(Into::into)
                     .collect();
-                hash_provider_refresh_states(&refresh_states, &mut hasher)?;
-                hasher.update(provider.r#type.as_bytes());
+                hash_provider_refresh_states(&refresh_states, hasher.as_mut())?;
+                hasher
+                    .update(provider.r#type.as_bytes())
+                    .map_err(crypto_err)?;
                 hash_provider_profile_revision(
                     catalog,
                     &provider.r#type,
                     &provider.profile_workspace,
-                    &mut hasher,
+                    hasher.as_mut(),
                 );
 
                 let mut credential_keys: Vec<_> = provider.credentials.keys().collect();
                 credential_keys.sort();
                 for key in credential_keys {
-                    hasher.update(key.as_bytes());
+                    hasher.update(key.as_bytes()).map_err(crypto_err)?;
                 }
                 let mut expiry_keys: Vec<_> = provider.credential_expiration_times.keys().collect();
                 expiry_keys.sort();
                 for key in expiry_keys {
-                    hasher.update(key.as_bytes());
+                    hasher.update(key.as_bytes()).map_err(crypto_err)?;
                     let value = &provider.credential_expiration_times[key];
-                    hasher.update(value.seconds.to_le_bytes());
-                    hasher.update(value.nanos.to_le_bytes());
+                    hasher
+                        .update(&value.seconds.to_le_bytes())
+                        .map_err(crypto_err)?;
+                    hasher
+                        .update(&value.nanos.to_le_bytes())
+                        .map_err(crypto_err)?;
                 }
             }
             None => {
-                hasher.update(b"missing");
+                hasher.update(b"missing").map_err(crypto_err)?;
             }
         }
     }
 
-    hash_policy_credential_bindings(policy_bindings, &mut hasher);
+    hash_policy_credential_bindings(policy_bindings, hasher.as_mut());
 
-    let digest = hasher.finalize();
+    let digest = hasher.finish().map_err(crypto_err)?;
     Ok(u64::from_le_bytes(digest[..8].try_into().map_err(
         |_| Status::internal("provider env revision digest too short"),
     )?))
@@ -3390,49 +3420,66 @@ fn compute_provider_env_revision_from_records_and_policy_bindings(
     policy_bindings: &HashMap<String, Vec<StaticCredentialEndpointBinding>>,
     global_policy: Option<&ProtoSandboxPolicy>,
 ) -> Result<u64, Status> {
-    let mut hasher = Sha256::new();
-    hasher.update(b"openshell-provider-env-revision-v4");
+    let crypto_err = |_| Status::internal("provider env revision hash failed");
+    let mut hasher = openshell_crypto::sha256_digest().map_err(crypto_err)?;
+    hasher
+        .update(b"openshell-provider-env-revision-v4")
+        .map_err(crypto_err)?;
 
     for record in records {
-        hasher.update(record.name.as_bytes());
-        hasher.update(record.object_id.as_bytes());
-        hasher.update(record.resource_version.to_le_bytes());
+        hasher.update(record.name.as_bytes()).map_err(crypto_err)?;
+        hasher
+            .update(record.object_id.as_bytes())
+            .map_err(crypto_err)?;
+        hasher
+            .update(&record.resource_version.to_le_bytes())
+            .map_err(crypto_err)?;
 
         let provider = &record.provider;
-        hash_provider_refresh_states(&record.refresh_states, &mut hasher)?;
-        hasher.update(provider.r#type.as_bytes());
+        hash_provider_refresh_states(&record.refresh_states, hasher.as_mut())?;
+        hasher
+            .update(provider.r#type.as_bytes())
+            .map_err(crypto_err)?;
         hash_provider_profile_revision(
             catalog,
             &provider.r#type,
             &provider.profile_workspace,
-            &mut hasher,
+            hasher.as_mut(),
         );
 
         let mut credential_keys: Vec<_> = provider.credentials.keys().collect();
         credential_keys.sort();
         for key in credential_keys {
-            hasher.update(key.as_bytes());
+            hasher.update(key.as_bytes()).map_err(crypto_err)?;
         }
         let mut expiry_keys: Vec<_> = provider.credential_expiration_times.keys().collect();
         expiry_keys.sort();
         for key in expiry_keys {
-            hasher.update(key.as_bytes());
+            hasher.update(key.as_bytes()).map_err(crypto_err)?;
             let value = &provider.credential_expiration_times[key];
-            hasher.update(value.seconds.to_le_bytes());
-            hasher.update(value.nanos.to_le_bytes());
+            hasher
+                .update(&value.seconds.to_le_bytes())
+                .map_err(crypto_err)?;
+            hasher
+                .update(&value.nanos.to_le_bytes())
+                .map_err(crypto_err)?;
         }
     }
 
-    hash_policy_credential_bindings(policy_bindings, &mut hasher);
+    hash_policy_credential_bindings(policy_bindings, hasher.as_mut());
 
     if let Some(policy) = global_policy {
         // Global policy replaces the grant owner list. Its changes must trigger
         // a provider refetch even when the attached provider records are unchanged.
-        hasher.update(b"global-token-grant-authority");
-        hasher.update(deterministic_policy_hash(policy).as_bytes());
+        hasher
+            .update(b"global-token-grant-authority")
+            .map_err(crypto_err)?;
+        hasher
+            .update(deterministic_policy_hash(policy).as_bytes())
+            .map_err(crypto_err)?;
     }
 
-    let digest = hasher.finalize();
+    let digest = hasher.finish().map_err(crypto_err)?;
     Ok(u64::from_le_bytes(digest[..8].try_into().map_err(
         |_| Status::internal("provider env revision digest too short"),
     )?))
@@ -3440,7 +3487,7 @@ fn compute_provider_env_revision_from_records_and_policy_bindings(
 
 fn hash_provider_refresh_states(
     states: &[StoredProviderCredentialRefreshState],
-    hasher: &mut Sha256,
+    hasher: &mut dyn openshell_crypto::Digest,
 ) -> Result<(), Status> {
     let mut states = states.iter().collect::<Vec<_>>();
     states.sort_by(|left, right| {
@@ -3453,20 +3500,29 @@ fn hash_provider_refresh_states(
                     .cmp(&right.metadata.as_ref().map(|metadata| metadata.id.as_str()))
             })
     });
+    let crypto_err = |_| Status::internal("provider refresh state hash failed");
     for state in states {
-        hasher.update(b"provider-refresh-state");
-        hasher.update(state.credential_key.as_bytes());
-        hasher.update(state.strategy.to_le_bytes());
-        hasher.update(crate::provider_refresh::effective_authorization_epoch(state)?.as_bytes());
+        hasher.update(b"provider-refresh-state").map_err(crypto_err)?;
+        hasher
+            .update(state.credential_key.as_bytes())
+            .map_err(crypto_err)?;
+        hasher
+            .update(&state.strategy.to_le_bytes())
+            .map_err(crypto_err)?;
+        hasher
+            .update(crate::provider_refresh::effective_authorization_epoch(state)?.as_bytes())
+            .map_err(crypto_err)?;
         if let Some(metadata) = &state.metadata {
-            hasher.update(metadata.id.as_bytes());
-            hasher.update(metadata.resource_version.to_le_bytes());
+            hasher.update(metadata.id.as_bytes()).map_err(crypto_err)?;
+            hasher
+                .update(&metadata.resource_version.to_le_bytes())
+                .map_err(crypto_err)?;
         }
         let mut outputs = state.additional_output_keys.iter().collect::<Vec<_>>();
         outputs.sort();
         for (output, key) in outputs {
-            hasher.update(output.as_bytes());
-            hasher.update(key.as_bytes());
+            hasher.update(output.as_bytes()).map_err(crypto_err)?;
+            hasher.update(key.as_bytes()).map_err(crypto_err)?;
         }
     }
     Ok(())
@@ -3474,20 +3530,28 @@ fn hash_provider_refresh_states(
 
 fn hash_policy_credential_bindings(
     bindings: &HashMap<String, Vec<StaticCredentialEndpointBinding>>,
-    hasher: &mut Sha256,
+    hasher: &mut dyn openshell_crypto::Digest,
 ) {
     let mut provider_names: Vec<_> = bindings.keys().collect();
     provider_names.sort();
     for provider_name in provider_names {
-        hasher.update(provider_name.as_bytes());
+        hasher
+            .update(provider_name.as_bytes())
+            .expect("sha256 update");
         let mut endpoints = bindings[provider_name].clone();
         endpoints.sort_by(|left, right| {
             (&left.host, left.port, &left.path).cmp(&(&right.host, right.port, &right.path))
         });
         for endpoint in endpoints {
-            hasher.update(endpoint.host.as_bytes());
-            hasher.update(endpoint.port.to_le_bytes());
-            hasher.update(endpoint.path.as_bytes());
+            hasher
+                .update(endpoint.host.as_bytes())
+                .expect("sha256 update");
+            hasher
+                .update(&endpoint.port.to_le_bytes())
+                .expect("sha256 update");
+            hasher
+                .update(endpoint.path.as_bytes())
+                .expect("sha256 update");
         }
     }
 }
@@ -3496,7 +3560,7 @@ fn hash_provider_profile_revision(
     catalog: &EffectiveProviderProfileCatalog,
     provider_type: &str,
     profile_workspace: &str,
-    hasher: &mut Sha256,
+    hasher: &mut dyn openshell_crypto::Digest,
 ) {
     catalog.hash_type_profile_revision_for_scope(provider_type, profile_workspace, hasher);
 }
@@ -7055,35 +7119,47 @@ fn compute_config_revision_with_validation_mode(
     policy_validation_failure_mode: openshell_core::PolicyValidationFailureMode,
     extension_authentication_enabled: bool,
 ) -> u64 {
-    let mut hasher = Sha256::new();
-    hasher.update((policy_source as i32).to_le_bytes());
-    hasher.update(policy_validation_failure_mode.as_str().as_bytes());
-    hasher.update([u8::from(extension_authentication_enabled)]);
+    let mut hasher = openshell_crypto::sha256_digest().expect("sha256 digest is available");
+    hasher
+        .update(&(policy_source as i32).to_le_bytes())
+        .expect("sha256 update");
+    hasher
+        .update(policy_validation_failure_mode.as_str().as_bytes())
+        .expect("sha256 update");
+    hasher
+        .update(&[u8::from(extension_authentication_enabled)])
+        .expect("sha256 update");
     if let Some(policy) = policy {
-        hasher.update(deterministic_policy_hash(policy).as_bytes());
+        hasher
+            .update(deterministic_policy_hash(policy).as_bytes())
+            .expect("sha256 update");
     }
     let mut entries: Vec<_> = settings.iter().collect();
     entries.sort_by_key(|(k, _)| k.as_str());
     for (key, setting) in entries {
-        hasher.update(key.as_bytes());
-        hasher.update(setting.scope.to_le_bytes());
+        hasher.update(key.as_bytes()).expect("sha256 update");
+        hasher
+            .update(&setting.scope.to_le_bytes())
+            .expect("sha256 update");
         if let Some(value) = setting.value.as_ref().and_then(|v| v.value.as_ref()) {
             match value {
                 setting_value::Value::StringValue(v) => {
-                    hasher.update([0]);
-                    hasher.update(v.as_bytes());
+                    hasher.update(&[0]).expect("sha256 update");
+                    hasher.update(v.as_bytes()).expect("sha256 update");
                 }
                 setting_value::Value::BoolValue(v) => {
-                    hasher.update([1]);
-                    hasher.update([u8::from(*v)]);
+                    hasher.update(&[1]).expect("sha256 update");
+                    hasher
+                        .update(&[u8::from(*v)])
+                        .expect("sha256 update");
                 }
                 setting_value::Value::IntValue(v) => {
-                    hasher.update([2]);
-                    hasher.update(v.to_le_bytes());
+                    hasher.update(&[2]).expect("sha256 update");
+                    hasher.update(&v.to_le_bytes()).expect("sha256 update");
                 }
                 setting_value::Value::BytesValue(v) => {
-                    hasher.update([3]);
-                    hasher.update(v);
+                    hasher.update(&[3]).expect("sha256 update");
+                    hasher.update(v).expect("sha256 update");
                 }
             }
         }
@@ -7091,10 +7167,12 @@ fn compute_config_revision_with_validation_mode(
     let mut middleware = supervisor_middleware_services.iter().collect::<Vec<_>>();
     middleware.sort_by(|left, right| left.name.cmp(&right.name));
     for service in middleware {
-        hasher.update(service.encode_to_vec());
+        hasher
+            .update(&service.encode_to_vec())
+            .expect("sha256 update");
     }
 
-    let digest = hasher.finalize();
+    let digest = hasher.finish().expect("sha256 finish");
     let mut bytes = [0_u8; 8];
     bytes.copy_from_slice(&digest[..8]);
     u64::from_le_bytes(bytes)
@@ -19447,13 +19525,15 @@ mod tests {
                 .unwrap();
 
         // Reconstruct a v2 token for unchanged inputs and no attached credentials.
-        let mut legacy = Sha256::new();
-        legacy.update(b"openshell-proposal-evaluator-v2\0");
-        legacy.update(evaluation.rule_name.as_bytes());
-        legacy.update(canonical_rule_bytes(&evaluation.rule));
-        legacy.update(evaluation.current_hash().as_bytes());
-        legacy.update(evaluation.candidate_hash().as_bytes());
-        chunk.review_token = hex::encode(legacy.finalize());
+        let mut legacy = openshell_crypto::sha256_digest().unwrap();
+        legacy.update(b"openshell-proposal-evaluator-v2\0").unwrap();
+        legacy.update(evaluation.rule_name.as_bytes()).unwrap();
+        legacy.update(&canonical_rule_bytes(&evaluation.rule)).unwrap();
+        legacy.update(evaluation.current_hash().as_bytes()).unwrap();
+        legacy
+            .update(evaluation.candidate_hash().as_bytes())
+            .unwrap();
+        chunk.review_token = hex::encode(legacy.finish().unwrap());
         chunk.validation_result = "prover: no new findings".to_string();
         assert!(
             state

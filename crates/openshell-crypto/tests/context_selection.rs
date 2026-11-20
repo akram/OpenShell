@@ -74,6 +74,9 @@ impl CryptoBackend for TestBackend {
             stage => Ok(Box::new(FailingDigest(stage))),
         }
     }
+    fn hmac_sha256(&self, key: &[u8], data: &[u8]) -> Result<[u8; 32], CryptoError> {
+        self.0.backend().hmac_sha256(key, data)
+    }
     fn seal(&self, _: &[u8; 32], _: &[u8], _: &[u8]) -> Result<Sealed, CryptoError> {
         Err(CryptoError::Random)
     }

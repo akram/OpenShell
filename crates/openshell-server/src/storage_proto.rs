@@ -118,7 +118,6 @@ mod tests {
     use openshell_core::proto::{SandboxPhase, SandboxStatus};
     use prost::Message;
     use prost_types::{DescriptorProto, EnumDescriptorProto, FileDescriptorSet};
-    use sha2::{Digest, Sha256};
     use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
     const STORAGE_V1_SCHEMA_SHA256: &str =
@@ -401,7 +400,7 @@ mod tests {
                 ));
             }
         }
-        format!("{:x}", Sha256::digest(schema.as_bytes()))
+        hex::encode(openshell_crypto::sha256(schema.as_bytes()).expect("hash schema fingerprint"))
     }
 
     fn append_message_schema(output: &mut String, prefix: &str, message: &DescriptorProto) {
@@ -474,7 +473,8 @@ mod tests {
     fn storage_v1_schema_is_frozen() {
         let (names, schema) = storage_schema();
         assert_eq!(names, STORAGE_MESSAGE_NAMES);
-        let actual = format!("{:x}", Sha256::digest(schema.as_bytes()));
+        let actual =
+            hex::encode(openshell_crypto::sha256(schema.as_bytes()).expect("hash schema"));
         assert_eq!(
             actual, STORAGE_V1_SCHEMA_SHA256,
             "openshell.storage.v1 changed; keep v1 decoders intact and introduce a versioned migration path before updating this reviewed fingerprint"
@@ -704,12 +704,16 @@ mod tests {
             .join("\n");
 
         let public_schema_hash = schema_fingerprint(&index, &public_closure);
-        let public_inventory_hash = format!(
-            "{:x}",
-            Sha256::digest(format!("{}\n{public_schema_hash}", methods.join("\n")).as_bytes())
+        let public_inventory_hash = hex::encode(
+            openshell_crypto::sha256(
+                format!("{}\n{public_schema_hash}", methods.join("\n")).as_bytes(),
+            )
+            .expect("hash public inventory"),
         );
         let durable_inventory_hash = schema_fingerprint(&index, &durable_closure);
-        let overlap_hash = format!("{:x}", Sha256::digest(overlap_inventory.as_bytes()));
+        let overlap_hash = hex::encode(
+            openshell_crypto::sha256(overlap_inventory.as_bytes()).expect("hash overlap inventory"),
+        );
 
         // Report the complete measured inventory on failure so one schema
         // change exposes every affected boundary in the same focused run.

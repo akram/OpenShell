@@ -10,7 +10,6 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, LazyLock};
 
-use hmac::{Hmac, Mac};
 use openshell_core::proto::{
     AddWorkspaceMemberRequest, AddWorkspaceMemberResponse, CreateSandboxTemplateRequest,
     CreateWorkspaceRequest, CreateWorkspaceResponse, DeleteSandboxTemplateRequest,
@@ -22,7 +21,6 @@ use openshell_core::{GetResourceVersion, ObjectId, rpc_error};
 use prost::Message;
 use prost_reflect::{DescriptorPool, DynamicMessage};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use tokio::sync::Semaphore;
 use tonic::{Request, Response, Status};
 
@@ -185,7 +183,7 @@ pub(super) async fn run<M: Mutation>(
         (
             key.fingerprint(original)?,
             Some(Protection {
-                key_id: key.id(),
+                key_id: key.id()?,
                 effective_payload_hash: key.fingerprint(request.get_ref())?,
                 effective_workspace_id: effective_scope.workspace_id,
                 effective_target_id: effective_scope.target_id,
@@ -502,15 +500,17 @@ fn fingerprint<M: Mutation>(request: &M) -> Result<String, Status> {
 struct FingerprintKey([u8; 32]);
 
 impl FingerprintKey {
-    fn id(&self) -> String {
-        format!("{:x}", Sha256::digest(self.0))
+    fn id(&self) -> Result<String, Status> {
+        Ok(hex::encode(
+            openshell_crypto::sha256(&self.0)
+                .map_err(|_| Status::internal("compute mutation key id"))?,
+        ))
     }
 
     fn fingerprint<M: Mutation>(&self, request: &M) -> Result<String, Status> {
-        let mut mac = Hmac::<Sha256>::new_from_slice(&self.0)
-            .map_err(|_| Status::internal("initialize mutation fingerprint"))?;
-        mac.update(fingerprint(request)?.as_bytes());
-        Ok(format!("{:x}", mac.finalize().into_bytes()))
+        let tag = openshell_crypto::hmac_sha256(&self.0, fingerprint(request)?.as_bytes())
+            .map_err(|_| Status::internal("compute mutation fingerprint"))?;
+        Ok(hex::encode(tag))
     }
 }
 
@@ -537,10 +537,11 @@ async fn fingerprint_key(state: &ServerState) -> Result<FingerprintKey, Status> 
     if bytes.is_empty() {
         return Err(unavailable());
     }
-    let mut hash = Sha256::new();
-    hash.update(b"openshell/mutation-fingerprint/v1\0");
-    hash.update(bytes);
-    Ok(FingerprintKey(hash.finalize().into()))
+    let mut hash = openshell_crypto::sha256_digest().map_err(|_| unavailable())?;
+    hash.update(b"openshell/mutation-fingerprint/v1\0")
+        .map_err(|_| unavailable())?;
+    hash.update(&bytes).map_err(|_| unavailable())?;
+    Ok(FingerprintKey(hash.finish().map_err(|_| unavailable())?))
 }
 
 // Sort every map explicitly; do not depend on serde_json's preserve_order feature.
@@ -565,7 +566,9 @@ fn hash_json(value: &serde_json::Value) -> Result<String, Status> {
     }
     let bytes = serde_json::to_vec(&Canonical(value))
         .map_err(|_| Status::internal("canonicalize mutation payload"))?;
-    Ok(format!("{:x}", Sha256::digest(bytes)))
+    Ok(hex::encode(
+        openshell_crypto::sha256(&bytes).map_err(|_| Status::internal("canonicalize mutation payload"))?,
+    ))
 }
 
 fn uncertain() -> Status {

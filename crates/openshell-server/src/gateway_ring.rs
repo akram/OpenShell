@@ -10,7 +10,6 @@
 //! store stays authoritative for who actually does, because a working session
 //! is never moved just because the ring changed. See [`crate::supervisor_owner`].
 
-use sha2::{Digest, Sha256};
 
 /// Points placed on the ring per replica.
 ///
@@ -98,7 +97,8 @@ impl GatewayRing {
 }
 
 fn hash_point(key: &str) -> u64 {
-    let digest = Sha256::digest(key.as_bytes());
+    let digest = openshell_crypto::sha256(key.as_bytes())
+        .expect("sha256 digest is infallible with a correctly installed backend");
     u64::from_be_bytes(
         digest[..8]
             .try_into()

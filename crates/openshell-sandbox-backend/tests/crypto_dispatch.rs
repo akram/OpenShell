@@ -45,6 +45,9 @@ impl CryptoBackend for Backend {
             _ => Ok(Box::new(FailingDigest)),
         }
     }
+    fn hmac_sha256(&self, key: &[u8], data: &[u8]) -> Result<[u8; 32], CryptoError> {
+        self.0.backend().hmac_sha256(key, data)
+    }
     fn seal(&self, _: &[u8; 32], _: &[u8], _: &[u8]) -> Result<aead::Sealed, CryptoError> {
         unreachable!()
     }

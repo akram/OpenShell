@@ -100,6 +100,9 @@ pub trait CryptoBackend: Send + Sync {
     fn fill_random(&self, output: &mut [u8]) -> Result<(), CryptoError>;
     /// Create an incremental SHA-256 computation.
     fn sha256_digest(&self) -> Result<Box<dyn Digest>, CryptoError>;
+    /// Compute HMAC-SHA256 over `data` with `key`. One-shot: callers that need
+    /// an incremental MAC should hash their own message first.
+    fn hmac_sha256(&self, key: &[u8], data: &[u8]) -> Result<[u8; 32], CryptoError>;
     /// Encrypt with a fresh random 96-bit nonce, appending the 128-bit GCM tag.
     fn seal(
         &self,
@@ -254,6 +257,11 @@ pub fn sha256(bytes: &[u8]) -> Result<[u8; 32], CryptoError> {
     digest.finish()
 }
 
+/// Compute HMAC-SHA256 using the selected implementation.
+pub fn hmac_sha256(key: &[u8], data: &[u8]) -> Result<[u8; 32], CryptoError> {
+    default_context().backend().hmac_sha256(key, data)
+}
+
 /// Install the JWT adapter if no provider has been installed.
 ///
 /// jsonwebtoken 10 does not expose its installed provider. A false return means
@@ -283,6 +291,17 @@ mod tests {
         digest.update(b"a").unwrap();
         digest.update(b"bc").unwrap();
         assert_eq!(digest.finish().unwrap(), expected);
+    }
+
+    #[test]
+    fn hmac_sha256_matches_rfc_4231_test_case_1() {
+        let key = [0x0b; 20];
+        let expected = [
+            0xb0, 0x34, 0x4c, 0x61, 0xd8, 0xdb, 0x38, 0x53, 0x5c, 0xa8, 0xaf, 0xce, 0xaf, 0x0b,
+            0xf1, 0x2b, 0x88, 0x1d, 0xc2, 0x00, 0xc9, 0x83, 0x3d, 0xa7, 0x26, 0xe9, 0x37, 0x6c,
+            0x2e, 0x32, 0xcf, 0xf7,
+        ];
+        assert_eq!(hmac_sha256(&key, b"Hi There").unwrap(), expected);
     }
 
     #[test]
@@ -413,6 +432,9 @@ mod tests {
         }
         fn sha256_digest(&self) -> Result<Box<dyn Digest>, CryptoError> {
             aws_lc::AwsLc.sha256_digest()
+        }
+        fn hmac_sha256(&self, key: &[u8], data: &[u8]) -> Result<[u8; 32], CryptoError> {
+            aws_lc::AwsLc.hmac_sha256(key, data)
         }
         fn seal(&self, _: &[u8; 32], _: &[u8], _: &[u8]) -> Result<aead::Sealed, CryptoError> {
             Err(CryptoError::Random)

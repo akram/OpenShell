@@ -9,7 +9,6 @@ use openshell_core::proto::pagination::v1::{
     page_token::Cursor,
 };
 use prost::Message;
-use sha2::{Digest, Sha256};
 use tonic::Status;
 
 use crate::persistence::ObjectCursor;
@@ -44,7 +43,7 @@ impl Pagination {
                 .expect("a positive i32 always fits in u32")
                 .min(MAX_PAGE_SIZE)
         };
-        let request_fingerprint = fingerprint(request_parameters);
+        let request_fingerprint = fingerprint(request_parameters)?;
         let cursor = if page_token.is_empty() {
             None
         } else {
@@ -167,17 +166,25 @@ impl Pagination {
     }
 }
 
-fn fingerprint(parameters: &[&str]) -> Vec<u8> {
-    let mut hasher = Sha256::new();
+fn fingerprint(parameters: &[&str]) -> Result<Vec<u8>, Status> {
+    let mut hasher = openshell_crypto::sha256_digest()
+        .map_err(|_| Status::internal("compute pagination fingerprint"))?;
     for parameter in parameters {
-        hasher.update(
-            u64::try_from(parameter.len())
-                .unwrap_or(u64::MAX)
-                .to_le_bytes(),
-        );
-        hasher.update(parameter.as_bytes());
+        hasher
+            .update(
+                &u64::try_from(parameter.len())
+                    .unwrap_or(u64::MAX)
+                    .to_le_bytes(),
+            )
+            .map_err(|_| Status::internal("compute pagination fingerprint"))?;
+        hasher
+            .update(parameter.as_bytes())
+            .map_err(|_| Status::internal("compute pagination fingerprint"))?;
     }
-    hasher.finalize().to_vec()
+    Ok(hasher
+        .finish()
+        .map_err(|_| Status::internal("compute pagination fingerprint"))?
+        .to_vec())
 }
 
 #[cfg(test)]
@@ -316,7 +323,7 @@ mod tests {
             PageToken {
                 version: TOKEN_VERSION + 1,
                 method: "sandboxes".to_string(),
-                request_fingerprint: fingerprint(&["default"]),
+                request_fingerprint: fingerprint(&["default"]).unwrap(),
                 cursor: Some(Cursor::Profile(ProfileCursor {
                     key: "profile".to_string(),
                 })),

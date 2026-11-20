@@ -22,7 +22,6 @@ use openshell_providers::{
     ProfileValidationDiagnostic, ProviderTypeProfile, normalize_profile_id, validate_profile_set,
 };
 use prost::Message as _;
-use sha2::{Digest, Sha256};
 use tokio::time::Instant;
 use tonic::Status;
 use tracing::{debug, warn};
@@ -101,8 +100,11 @@ impl ProviderProfileSource for UserProviderProfileSource {
         workspace: &str,
     ) -> Result<ProviderProfileSnapshot, Status> {
         let mut profiles = Vec::new();
-        let mut hasher = Sha256::new();
-        hasher.update(b"openshell-user-provider-profile-source-v1");
+        let hash_err = |_| Status::internal("hash provider profile snapshot");
+        let mut hasher = openshell_crypto::sha256_digest().map_err(hash_err)?;
+        hasher
+            .update(b"openshell-user-provider-profile-source-v1")
+            .map_err(hash_err)?;
 
         let platform_stored: Vec<StoredProviderProfile> = store
             .collect_messages(ObjectListQuery::Workspace(""))
@@ -112,11 +114,15 @@ impl ProviderProfileSource for UserProviderProfileSource {
             })?;
         for stored in platform_stored {
             let resource_version = stored_profile_resource_version(&stored);
-            hasher.update(resource_version.to_le_bytes());
+            hasher
+                .update(&resource_version.to_le_bytes())
+                .map_err(hash_err)?;
             if let Some(profile) = stored.profile {
                 let mut profile = profile_response_payload(profile, resource_version);
                 normalize_provider_profile_mcp_fields(&mut profile);
-                hasher.update(canonical_provider_profile_bytes(&profile));
+                hasher
+                    .update(&canonical_provider_profile_bytes(&profile))
+                    .map_err(hash_err)?;
                 profiles.push(ScopedSnapshotProfile {
                     scope: ProfileScope::Platform,
                     profile,
@@ -133,11 +139,15 @@ impl ProviderProfileSource for UserProviderProfileSource {
                 })?;
             for stored in ws_stored {
                 let resource_version = stored_profile_resource_version(&stored);
-                hasher.update(resource_version.to_le_bytes());
+                hasher
+                    .update(&resource_version.to_le_bytes())
+                    .map_err(hash_err)?;
                 if let Some(profile) = stored.profile {
                     let mut profile = profile_response_payload(profile, resource_version);
                     normalize_provider_profile_mcp_fields(&mut profile);
-                    hasher.update(canonical_provider_profile_bytes(&profile));
+                    hasher
+                        .update(&canonical_provider_profile_bytes(&profile))
+                        .map_err(hash_err)?;
                     profiles.push(ScopedSnapshotProfile {
                         scope: ProfileScope::Workspace,
                         profile,
@@ -147,7 +157,7 @@ impl ProviderProfileSource for UserProviderProfileSource {
         }
 
         Ok(ProviderProfileSnapshot {
-            revision: format!("sha256:{:x}", hasher.finalize()),
+            revision: format!("sha256:{}", hex::encode(hasher.finish().map_err(hash_err)?)),
             profiles,
         })
     }
@@ -657,10 +667,10 @@ impl EffectiveProviderProfileCatalog {
         &self,
         profile_id: &str,
         profile_workspace: &str,
-        hasher: &mut Sha256,
+        hasher: &mut dyn openshell_crypto::Digest,
     ) {
         let Some(entry) = self.scoped_type_profile_for_scope(profile_id, profile_workspace) else {
-            hasher.update(b"missing");
+            hasher.update(b"missing").expect("sha256 digest");
             return;
         };
 
@@ -668,23 +678,29 @@ impl EffectiveProviderProfileCatalog {
     }
 }
 
-fn hash_scoped_profile_revision(entry: &ScopedProfileEntry, hasher: &mut Sha256) {
-    hasher.update(b"provider-profile-source-entry");
-    hasher.update(entry.source_id.as_bytes());
-    hasher.update(entry.source_revision.as_bytes());
+fn hash_scoped_profile_revision(entry: &ScopedProfileEntry, hasher: &mut dyn openshell_crypto::Digest) {
+    hasher
+        .update(b"provider-profile-source-entry")
+        .expect("sha256 digest");
+    hasher.update(entry.source_id.as_bytes()).expect("sha256 digest");
+    hasher
+        .update(entry.source_revision.as_bytes())
+        .expect("sha256 digest");
     let scope_tag: &[u8] = match entry.scope {
         ProfileScope::Static => b"static",
         ProfileScope::Platform => b"platform",
         ProfileScope::Workspace => b"workspace",
     };
-    hasher.update(scope_tag);
+    hasher.update(scope_tag).expect("sha256 digest");
     let ownership_tag: &[u8] = if entry.user_managed {
         b"user-managed"
     } else {
         b"source-managed"
     };
-    hasher.update(ownership_tag);
-    hasher.update(canonical_provider_profile_bytes(&entry.response));
+    hasher.update(ownership_tag).expect("sha256 digest");
+    hasher
+        .update(&canonical_provider_profile_bytes(&entry.response))
+        .expect("sha256 digest");
 }
 
 /// Keep profile revision inputs stable across protobuf map iteration orders.
@@ -732,8 +748,11 @@ fn build_effective_profiles(
     let mut source_ids = BTreeSet::new();
     let mut profiles: BTreeMap<String, EffectiveProfileEntry> = BTreeMap::new();
     let source_count = snapshots.len();
-    let mut catalog_hasher = Sha256::new();
-    catalog_hasher.update(b"openshell-effective-provider-profile-catalog-v1");
+    let hash_err = |_| Status::internal("hash effective provider profile catalog");
+    let mut catalog_hasher = openshell_crypto::sha256_digest().map_err(hash_err)?;
+    catalog_hasher
+        .update(b"openshell-effective-provider-profile-catalog-v1")
+        .map_err(hash_err)?;
 
     for snapshot in snapshots {
         let source_id = snapshot.source_id.trim();
@@ -761,10 +780,16 @@ fn build_effective_profiles(
             )));
         }
 
-        catalog_hasher.update((source_id.len() as u64).to_le_bytes());
-        catalog_hasher.update(source_id.as_bytes());
-        catalog_hasher.update((source_revision.len() as u64).to_le_bytes());
-        catalog_hasher.update(source_revision.as_bytes());
+        catalog_hasher
+            .update(&(source_id.len() as u64).to_le_bytes())
+            .map_err(hash_err)?;
+        catalog_hasher.update(source_id.as_bytes()).map_err(hash_err)?;
+        catalog_hasher
+            .update(&(source_revision.len() as u64).to_le_bytes())
+            .map_err(hash_err)?;
+        catalog_hasher
+            .update(source_revision.as_bytes())
+            .map_err(hash_err)?;
 
         if snapshot.user_managed {
             let platform: Vec<_> = snapshot
@@ -886,7 +911,10 @@ fn build_effective_profiles(
 
     Ok(EffectiveProviderProfileCatalog {
         profiles,
-        revision: format!("sha256:{:x}", catalog_hasher.finalize()),
+        revision: format!(
+            "sha256:{}",
+            hex::encode(catalog_hasher.finish().map_err(hash_err)?)
+        ),
         source_count,
     })
 }
@@ -926,12 +954,19 @@ fn profile_snapshot_revision(profiles: &[ProviderProfile]) -> String {
         .iter_mut()
         .for_each(normalize_provider_profile_mcp_fields);
     profiles.sort_by(|left, right| left.id.cmp(&right.id));
-    let mut hasher = Sha256::new();
-    hasher.update(b"openshell-provider-profile-snapshot-v1");
+    let mut hasher = openshell_crypto::sha256_digest().expect("sha256 digest");
+    hasher
+        .update(b"openshell-provider-profile-snapshot-v1")
+        .expect("sha256 digest");
     for profile in profiles {
-        hasher.update(canonical_provider_profile_bytes(&profile));
+        hasher
+            .update(&canonical_provider_profile_bytes(&profile))
+            .expect("sha256 digest");
     }
-    format!("sha256:{:x}", hasher.finalize())
+    format!(
+        "sha256:{}",
+        hex::encode(hasher.finish().expect("sha256 digest"))
+    )
 }
 
 #[cfg(test)]
@@ -1209,20 +1244,23 @@ mod tests {
         let canonical = catalog(&["2025-03-26", "2025-11-25"]);
         let reordered = catalog(&["2025-11-25", "2025-03-26"]);
 
-        let mut canonical_hash = Sha256::new();
+        let mut canonical_hash = openshell_crypto::sha256_digest().expect("sha256 digest");
         canonical.hash_type_profile_revision_for_scope(
             "versioned-profile",
             "",
-            &mut canonical_hash,
+            canonical_hash.as_mut(),
         );
-        let mut reordered_hash = Sha256::new();
+        let mut reordered_hash = openshell_crypto::sha256_digest().expect("sha256 digest");
         reordered.hash_type_profile_revision_for_scope(
             "versioned-profile",
             "",
-            &mut reordered_hash,
+            reordered_hash.as_mut(),
         );
 
-        assert_eq!(canonical_hash.finalize(), reordered_hash.finalize());
+        assert_eq!(
+            canonical_hash.finish().expect("sha256 digest"),
+            reordered_hash.finish().expect("sha256 digest")
+        );
         assert_eq!(
             canonical.get_profile("versioned-profile"),
             reordered.get_profile("versioned-profile")
@@ -1261,9 +1299,9 @@ mod tests {
         let explicit = catalog(explicit_profile);
 
         let fingerprint = |catalog: &EffectiveProviderProfileCatalog| {
-            let mut hash = Sha256::new();
-            catalog.hash_type_profile_revision_for_scope("versioned-profile", "", &mut hash);
-            hash.finalize()
+            let mut hash = openshell_crypto::sha256_digest().expect("sha256 digest");
+            catalog.hash_type_profile_revision_for_scope("versioned-profile", "", hash.as_mut());
+            hash.finish().expect("sha256 digest")
         };
         assert_eq!(fingerprint(&omitted), fingerprint(&explicit));
         assert_eq!(fingerprint(&empty), fingerprint(&explicit));
@@ -1345,13 +1383,13 @@ mod tests {
             "revision-a"
         );
         assert!(first.get_type_profile("moving-profile").is_some());
-        let mut first_profile_hash = Sha256::new();
+        let mut first_profile_hash = openshell_crypto::sha256_digest().expect("sha256 digest");
         first.hash_type_profile_revision_for_scope(
             "moving-profile",
             "default",
-            &mut first_profile_hash,
+            first_profile_hash.as_mut(),
         );
-        let first_profile_hash = first_profile_hash.finalize();
+        let first_profile_hash = first_profile_hash.finish().expect("sha256 digest");
         assert_eq!(fetch_count.load(Ordering::SeqCst), 1);
 
         let second = sources.snapshot_catalog(&store, "default").await.unwrap();
@@ -1360,13 +1398,16 @@ mod tests {
             second.get_profile("moving-profile").unwrap().display_name,
             "revision-b"
         );
-        let mut second_profile_hash = Sha256::new();
+        let mut second_profile_hash = openshell_crypto::sha256_digest().expect("sha256 digest");
         second.hash_type_profile_revision_for_scope(
             "moving-profile",
             "default",
-            &mut second_profile_hash,
+            second_profile_hash.as_mut(),
         );
-        assert_ne!(first_profile_hash, second_profile_hash.finalize());
+        assert_ne!(
+            first_profile_hash,
+            second_profile_hash.finish().expect("sha256 digest")
+        );
         assert_ne!(first.revision(), second.revision());
     }
 
@@ -1427,9 +1468,9 @@ mod tests {
         );
 
         let profile_hash = |catalog: &EffectiveProviderProfileCatalog| {
-            let mut hasher = Sha256::new();
-            catalog.hash_type_profile_revision_for_scope("github", "", &mut hasher);
-            hasher.finalize()
+            let mut hasher = openshell_crypto::sha256_digest().expect("sha256 digest");
+            catalog.hash_type_profile_revision_for_scope("github", "", hasher.as_mut());
+            hasher.finish().expect("sha256 digest")
         };
         assert_ne!(profile_hash(&plain), profile_hash(&padded));
     }
@@ -1917,9 +1958,9 @@ mod tests {
         for _ in 0..32 {
             let catalog = sources.snapshot_catalog(&store, "default").await.unwrap();
             source_revisions.insert(catalog.revision().to_string());
-            let mut hasher = Sha256::new();
-            catalog.hash_type_profile_revision_for_scope("annotated-api", "default", &mut hasher);
-            profile_revisions.insert(hasher.finalize().to_vec());
+            let mut hasher = openshell_crypto::sha256_digest().expect("sha256 digest");
+            catalog.hash_type_profile_revision_for_scope("annotated-api", "default", hasher.as_mut());
+            profile_revisions.insert(hasher.finish().expect("sha256 digest").to_vec());
         }
 
         assert_eq!(source_revisions.len(), 1);
@@ -2285,31 +2326,31 @@ mod tests {
 
         let broad = catalog("/**");
         let narrow = catalog("/v1/**");
-        let mut broad_platform_hash = Sha256::new();
-        broad.hash_type_profile_revision_for_scope("anthropic", "", &mut broad_platform_hash);
-        let mut narrow_platform_hash = Sha256::new();
-        narrow.hash_type_profile_revision_for_scope("anthropic", "", &mut narrow_platform_hash);
+        let mut broad_platform_hash = openshell_crypto::sha256_digest().expect("sha256 digest");
+        broad.hash_type_profile_revision_for_scope("anthropic", "", broad_platform_hash.as_mut());
+        let mut narrow_platform_hash = openshell_crypto::sha256_digest().expect("sha256 digest");
+        narrow.hash_type_profile_revision_for_scope("anthropic", "", narrow_platform_hash.as_mut());
         assert_ne!(
-            broad_platform_hash.finalize(),
-            narrow_platform_hash.finalize(),
+            broad_platform_hash.finish().expect("sha256 digest"),
+            narrow_platform_hash.finish().expect("sha256 digest"),
             "platform-scoped providers must hash the selected platform fallback"
         );
 
-        let mut broad_workspace_hash = Sha256::new();
+        let mut broad_workspace_hash = openshell_crypto::sha256_digest().expect("sha256 digest");
         broad.hash_type_profile_revision_for_scope(
             "anthropic",
             "default",
-            &mut broad_workspace_hash,
+            broad_workspace_hash.as_mut(),
         );
-        let mut narrow_workspace_hash = Sha256::new();
+        let mut narrow_workspace_hash = openshell_crypto::sha256_digest().expect("sha256 digest");
         narrow.hash_type_profile_revision_for_scope(
             "anthropic",
             "default",
-            &mut narrow_workspace_hash,
+            narrow_workspace_hash.as_mut(),
         );
         assert_eq!(
-            broad_workspace_hash.finalize(),
-            narrow_workspace_hash.finalize(),
+            broad_workspace_hash.finish().expect("sha256 digest"),
+            narrow_workspace_hash.finish().expect("sha256 digest"),
             "workspace-scoped providers must remain keyed to the workspace override"
         );
     }

@@ -29,7 +29,6 @@ use openshell_core::proto::{
     TokenGrantStatus,
 };
 use prost::Message;
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
@@ -175,7 +174,8 @@ async fn handle_report_endpoint_status_inner(
         cursor.policy_hash != req.policy_hash
             || cursor.provider_env_revision != req.provider_env_revision
     });
-    let report_digest: [u8; 32] = Sha256::digest(req.encode_to_vec()).into();
+    let report_digest: [u8; 32] = openshell_crypto::sha256(&req.encode_to_vec())
+        .map_err(|_| Status::internal("compute tool server endpoint report digest"))?;
     if let Some(cursor) = current_cursor.as_ref() {
         if req.report_sequence < cursor.report_sequence {
             return Err(Status::failed_precondition(

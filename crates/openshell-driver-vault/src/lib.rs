@@ -19,7 +19,6 @@ use openshell_core::proto::credentials::v1::{
 use openshell_core::{Error, Result as CoreResult};
 use reqwest::{Certificate, StatusCode, Url};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use tonic::{Request, Response, Status};
 
 const DEFAULT_MOUNT: &str = "secret";
@@ -828,6 +827,14 @@ fn delete_api_path_for_reference(mount: &str, kv_version: KvVersion, target: &st
     }
 }
 
+/// Lower-case hex encoding for a digest. `openshell_crypto::sha256_digest`
+/// returns a plain `[u8; 32]`, not a type with its own `LowerHex` impl, so
+/// this replaces the `format!("{:x}", ...)` the RustCrypto `sha2`/`digest`
+/// crates used to provide for free.
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
 fn managed_secret_path(
     workspace: &str,
     provider_id: &str,
@@ -835,20 +842,31 @@ fn managed_secret_path(
     credential_key: &str,
     object_id: &str,
 ) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(workspace.as_bytes());
-    hasher.update([0]);
-    hasher.update(provider_id.as_bytes());
-    hasher.update([0]);
-    hasher.update(provider_name.as_bytes());
-    hasher.update([0]);
-    hasher.update(credential_key.as_bytes());
+    let mut hasher = openshell_crypto::sha256_digest()
+        .expect("sha256 is infallible with a correctly installed backend");
+    let mut parts: Vec<&[u8]> = vec![
+        workspace.as_bytes(),
+        &[0],
+        provider_id.as_bytes(),
+        &[0],
+        provider_name.as_bytes(),
+        &[0],
+        credential_key.as_bytes(),
+    ];
     if object_id != provider_id {
-        hasher.update([0]);
-        hasher.update(object_id.as_bytes());
+        parts.push(&[0]);
+        parts.push(object_id.as_bytes());
     }
-    let digest = hasher.finalize();
-    let hex = format!("{digest:x}");
+    for part in parts {
+        hasher
+            .update(part)
+            .expect("sha256 is infallible with a correctly installed backend");
+    }
+    let hex = hex_encode(
+        &hasher
+            .finish()
+            .expect("sha256 is infallible with a correctly installed backend"),
+    );
     format!("openshell/provider-credentials/{}", &hex[..40])
 }
 

@@ -102,6 +102,18 @@ impl CryptoBackend for OpenSsl {
             Hasher::new(MessageDigest::sha256()).map_err(|_| CryptoError::Operation)?,
         )))
     }
+    fn hmac_sha256(&self, key: &[u8], data: &[u8]) -> Result<[u8; 32], CryptoError> {
+        let pkey = PKey::hmac(key).map_err(|_| CryptoError::Operation)?;
+        let mut signer =
+            Signer::new(MessageDigest::sha256(), &pkey).map_err(|_| CryptoError::Operation)?;
+        signer.update(data).map_err(|_| CryptoError::Operation)?;
+        signer
+            .sign_to_vec()
+            .map_err(|_| CryptoError::Operation)?
+            .as_slice()
+            .try_into()
+            .map_err(|_| CryptoError::Operation)
+    }
     fn seal(&self, key: &[u8; 32], aad: &[u8], plaintext: &[u8]) -> Result<Sealed, CryptoError> {
         let mut nonce = [0; 12];
         self.fill_random(&mut nonce)?;
@@ -360,6 +372,16 @@ impl ProtocolBackend for OpenSsl {
 mod tests {
     use super::*;
     use crate::pki::SigningKey;
+
+    #[test]
+    fn hmac_sha256_matches_aws_lc() {
+        let key = b"a sample key that is longer than one block";
+        let data = b"the quick brown fox jumps over the lazy dog";
+        assert_eq!(
+            OpenSsl.hmac_sha256(key, data).unwrap(),
+            crate::aws_lc::AwsLc.hmac_sha256(key, data).unwrap()
+        );
+    }
 
     #[test]
     fn signing_rejects_an_unmapped_algorithm() {

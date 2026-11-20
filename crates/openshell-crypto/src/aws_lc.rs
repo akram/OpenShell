@@ -5,7 +5,7 @@
 
 use crate::{Capabilities, CryptoBackend, CryptoError, Digest, FipsState, ProtocolBackend};
 use aws_lc_rs::{
-    aead, digest,
+    aead, digest, hmac,
     rand::{SecureRandom, SystemRandom},
 };
 
@@ -47,6 +47,12 @@ impl CryptoBackend for AwsLc {
     }
     fn sha256_digest(&self) -> Result<Box<dyn Digest>, CryptoError> {
         Ok(Box::new(Sha256(digest::Context::new(&digest::SHA256))))
+    }
+    fn hmac_sha256(&self, key: &[u8], data: &[u8]) -> Result<[u8; 32], CryptoError> {
+        let key = hmac::Key::new(hmac::HMAC_SHA256, key);
+        let mut output = [0; 32];
+        output.copy_from_slice(hmac::sign(&key, data).as_ref());
+        Ok(output)
     }
     fn seal(
         &self,

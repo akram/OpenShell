@@ -25,7 +25,6 @@ k8s-openapi = { workspace = true }
 kube = { workspace = true }
 miette = { workspace = true }
 serde = { workspace = true }
-sha2 = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
 tonic = { workspace = true }

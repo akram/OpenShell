@@ -47,7 +47,6 @@ tower-http = { workspace = true }
 http = { workspace = true }
 thiserror = { workspace = true }
 miette = { workspace = true }
-sha2 = { workspace = true }
 url = { workspace = true }
 
 [features]

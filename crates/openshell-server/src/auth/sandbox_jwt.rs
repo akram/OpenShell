@@ -26,7 +26,6 @@ pub use openshell_extension_core::{
 };
 use rustls::pki_types::pem::{PemObject, SectionKind};
 use serde::Serialize;
-use sha2::{Digest as _, Sha256};
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -217,13 +216,25 @@ impl SandboxSessionJwtAuthority {
         // Derive the session from durable launch identity, not token IDs or
         // minting time. Retries and credential renewal retain this session;
         // a fresh generation gets a different one without new stored metadata.
-        let mut digest = Sha256::new();
-        digest.update(b"openshell-launch-session-v1\0");
-        digest.update(sandbox_id.as_bytes());
-        digest.update(b"\0");
-        digest.update(runtime_generation.as_str().as_bytes());
+        let mut digest = openshell_crypto::sha256_digest()
+            .map_err(|_| Status::internal("derive sandbox launch session"))?;
+        digest
+            .update(b"openshell-launch-session-v1\0")
+            .map_err(|_| Status::internal("derive sandbox launch session"))?;
+        digest
+            .update(sandbox_id.as_bytes())
+            .map_err(|_| Status::internal("derive sandbox launch session"))?;
+        digest
+            .update(b"\0")
+            .map_err(|_| Status::internal("derive sandbox launch session"))?;
+        digest
+            .update(runtime_generation.as_str().as_bytes())
+            .map_err(|_| Status::internal("derive sandbox launch session"))?;
         let mut session_bytes = [0_u8; 16];
-        session_bytes.copy_from_slice(&digest.finalize()[..16]);
+        let finished = digest
+            .finish()
+            .map_err(|_| Status::internal("derive sandbox launch session"))?;
+        session_bytes.copy_from_slice(&finished[..16]);
         let session_id = uuid::Uuid::from_bytes(session_bytes)
             .to_string()
             .parse::<SandboxSessionId>()

@@ -7,7 +7,6 @@ use crate::proto::{
     NetworkMiddlewareConfig, NetworkPolicyRule, SandboxPolicy as ProtoSandboxPolicy,
 };
 use prost::Message;
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 
 #[allow(clippy::cast_possible_truncation)]
@@ -15,6 +14,14 @@ const fn canonical_size(value: usize) -> [u8; 8] {
     // Every supported Rust pointer width fits in u64, so encoding a collection
     // length or index needs no fallible conversion.
     (value as u64).to_le_bytes()
+}
+
+/// Lower-case hex encoding for a digest. `openshell_crypto::sha256` returns a
+/// plain `[u8; 32]`, not a type with its own `LowerHex` impl, so this
+/// replaces the `format!("{:x}", ...)` the RustCrypto `sha2`/`digest` crates
+/// used to provide for free.
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 fn append_canonical_bytes(out: &mut Vec<u8>, value: &[u8]) {
@@ -173,7 +180,10 @@ fn canonical_policy_bytes(policy: &ProtoSandboxPolicy) -> Vec<u8> {
 /// Compute a deterministic SHA-256 hash of a `SandboxPolicy`, recursively
 /// sorting every protobuf map while preserving repeated-field order.
 pub fn deterministic_policy_hash(policy: &ProtoSandboxPolicy) -> String {
-    format!("{:x}", Sha256::digest(canonical_policy_bytes(policy)))
+    hex_encode(
+        &openshell_crypto::sha256(&canonical_policy_bytes(policy))
+            .expect("sha256 is infallible with a correctly installed backend"),
+    )
 }
 
 /// Derive token-grant authorities from a provider record and its complete profile rule.
@@ -243,7 +253,13 @@ fn token_grant_owner(domain: &[u8], identity: &[u8], policy: &[u8], index: usize
     append_canonical_bytes(&mut input, identity);
     append_canonical_bytes(&mut input, policy);
     input.extend_from_slice(&canonical_size(index));
-    format!("grant-owner:v1:{:x}", Sha256::digest(input))
+    format!(
+        "grant-owner:v1:{}",
+        hex_encode(
+            &openshell_crypto::sha256(&input)
+                .expect("sha256 is infallible with a correctly installed backend")
+        )
+    )
 }
 
 #[cfg(test)]

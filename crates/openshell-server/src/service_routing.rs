@@ -19,7 +19,6 @@ use openshell_ocsf::{
     HttpActivityBuilder, HttpRequest, HttpResponse as OcsfHttpResponse, NetworkActivityBuilder,
     OcsfEvent, SeverityId, StateId, StatusId, Url as OcsfUrl,
 };
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
@@ -228,15 +227,19 @@ pub fn service_route_hash_label(
     sandbox: &str,
     service: Option<&str>,
 ) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(gateway_name.as_bytes());
-    hasher.update([0]);
-    hasher.update(workspace.as_bytes());
-    hasher.update([0]);
-    hasher.update(sandbox.as_bytes());
-    hasher.update([0]);
-    hasher.update(service.unwrap_or("").as_bytes());
-    let digest = hasher.finalize();
+    let mut hasher = openshell_crypto::sha256_digest()
+        .expect("sha256 digest is infallible with a correctly installed backend");
+    let infallible = "sha256 digest is infallible with a correctly installed backend";
+    hasher.update(gateway_name.as_bytes()).expect(infallible);
+    hasher.update(&[0]).expect(infallible);
+    hasher.update(workspace.as_bytes()).expect(infallible);
+    hasher.update(&[0]).expect(infallible);
+    hasher.update(sandbox.as_bytes()).expect(infallible);
+    hasher.update(&[0]).expect(infallible);
+    hasher
+        .update(service.unwrap_or("").as_bytes())
+        .expect(infallible);
+    let digest = hasher.finish().expect(infallible);
     base32_lower_no_padding(&digest[..10])
 }
 

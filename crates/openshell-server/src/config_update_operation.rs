@@ -19,7 +19,6 @@ use openshell_core::proto::{
 };
 use openshell_core::rpc_error::{self, ErrorDetails, StatusExt};
 use prost::Message;
-use sha2::{Digest, Sha256};
 use tonic::{Code, Status};
 
 use crate::persistence::{ObjectRecord, ObjectType, PersistenceError, Store, WriteCondition};
@@ -85,8 +84,10 @@ fn observation_id(
     snapshot_reason: ProviderReadinessReason,
 ) -> Result<String, Status> {
     let desired = receipt.desired.as_ref().ok_or_else(invalid_record)?;
-    let mut digest = Sha256::new();
-    digest.update(b"openshell/provider-observation/v1\0");
+    let mut digest = openshell_crypto::sha256_digest().map_err(|_| invalid_record())?;
+    digest
+        .update(b"openshell/provider-observation/v1\0")
+        .map_err(|_| invalid_record())?;
     let target_bytes = desired.encode_to_vec();
     // The target contains only public identity and opaque revision fields. Its
     // protobuf has no maps, so encoding is canonical. Length framing prevents
@@ -97,16 +98,19 @@ fn observation_id(
         target_bytes.as_slice(),
     ] {
         let length = u64::try_from(component.len()).map_err(|_| invalid_record())?;
-        digest.update(length.to_be_bytes());
-        digest.update(component);
+        digest
+            .update(&length.to_be_bytes())
+            .map_err(|_| invalid_record())?;
+        digest.update(component).map_err(|_| invalid_record())?;
     }
     // A failed capture and its later successful repair are different targets;
     // the original failed operation must remain immutable.
-    digest.update((snapshot_reason as i32).to_be_bytes());
+    digest
+        .update(&(snapshot_reason as i32).to_be_bytes())
+        .map_err(|_| invalid_record())?;
+    let hashed = digest.finish().map_err(|_| invalid_record())?;
     let mut bytes = [0_u8; 16];
-    for (byte, hashed) in bytes.iter_mut().zip(digest.finalize()) {
-        *byte = hashed;
-    }
+    bytes.copy_from_slice(&hashed[..16]);
     Ok(uuid::Builder::from_custom_bytes(bytes)
         .into_uuid()
         .to_string())

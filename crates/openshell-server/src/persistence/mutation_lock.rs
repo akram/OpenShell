@@ -37,7 +37,6 @@
 //! scope of this release, so mixed-version fleets stay mutually exclusive
 //! during a rolling upgrade.
 
-use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::time::Duration;
 
@@ -145,15 +144,16 @@ impl MutationLockKey<'_> {
 }
 
 fn derived_key(kind: &[u8], value: &str) -> i64 {
-    let digest = Sha256::new()
-        .chain_update(KEY_DOMAIN)
-        .chain_update([0])
-        .chain_update(kind)
-        .chain_update([0])
-        .chain_update(value.as_bytes())
-        .finalize();
+    const INFALLIBLE: &str = "sha256 digest is infallible with a correctly installed backend";
+    let mut digest = openshell_crypto::sha256_digest().expect(INFALLIBLE);
+    digest.update(KEY_DOMAIN).expect(INFALLIBLE);
+    digest.update(&[0]).expect(INFALLIBLE);
+    digest.update(kind).expect(INFALLIBLE);
+    digest.update(&[0]).expect(INFALLIBLE);
+    digest.update(value.as_bytes()).expect(INFALLIBLE);
+    let hash = digest.finish().expect(INFALLIBLE);
     let mut prefix = [0_u8; 8];
-    prefix.copy_from_slice(&digest[..8]);
+    prefix.copy_from_slice(&hash[..8]);
     avoid_reserved(i64::from_be_bytes(prefix))
 }
 

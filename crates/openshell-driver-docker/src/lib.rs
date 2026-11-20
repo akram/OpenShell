@@ -67,7 +67,6 @@ use openshell_sandbox_backend::boundary_protocol::{
     SandboxTlsServerConfig, generate_sandbox_tls_material,
 };
 use opentelemetry::trace::TraceContextExt as _;
-use sha2::{Digest as _, Sha256};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
@@ -4160,12 +4159,31 @@ fn docker_channel_volume_name_by_id(
     sandbox_id: &str,
     config: &DockerDriverRuntimeConfig,
 ) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(config.sandbox_namespace.as_bytes());
-    hasher.update([0]);
-    hasher.update(sandbox_id.as_bytes());
-    let digest = format!("{:x}", hasher.finalize());
+    let mut hasher = openshell_crypto::sha256_digest()
+        .expect("sha256 is infallible with a correctly installed backend");
+    hasher
+        .update(config.sandbox_namespace.as_bytes())
+        .expect("sha256 is infallible with a correctly installed backend");
+    hasher
+        .update(&[0])
+        .expect("sha256 is infallible with a correctly installed backend");
+    hasher
+        .update(sandbox_id.as_bytes())
+        .expect("sha256 is infallible with a correctly installed backend");
+    let digest = hex_encode(
+        &hasher
+            .finish()
+            .expect("sha256 is infallible with a correctly installed backend"),
+    );
     format!("openshell-channel-{}", &digest[..32])
+}
+
+/// Lower-case hex encoding for a digest. `openshell_crypto::sha256_digest`
+/// returns a plain `[u8; 32]`, not a type with its own `LowerHex` impl, so
+/// this replaces the `format!("{:x}", ...)` the RustCrypto `sha2`/`digest`
+/// crates used to provide for free.
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 fn docker_supervisor_volume_name(
@@ -4179,11 +4197,22 @@ fn docker_supervisor_volume_name_by_id(
     sandbox_id: &str,
     config: &DockerDriverRuntimeConfig,
 ) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(config.sandbox_namespace.as_bytes());
-    hasher.update([0]);
-    hasher.update(sandbox_id.as_bytes());
-    let digest = format!("{:x}", hasher.finalize());
+    let mut hasher = openshell_crypto::sha256_digest()
+        .expect("sha256 is infallible with a correctly installed backend");
+    hasher
+        .update(config.sandbox_namespace.as_bytes())
+        .expect("sha256 is infallible with a correctly installed backend");
+    hasher
+        .update(&[0])
+        .expect("sha256 is infallible with a correctly installed backend");
+    hasher
+        .update(sandbox_id.as_bytes())
+        .expect("sha256 is infallible with a correctly installed backend");
+    let digest = hex_encode(
+        &hasher
+            .finish()
+            .expect("sha256 is infallible with a correctly installed backend"),
+    );
     format!("openshell-supervisor-{}", &digest[..32])
 }
 

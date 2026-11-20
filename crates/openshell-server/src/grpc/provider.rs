@@ -36,7 +36,6 @@ use openshell_core::telemetry::{
 use openshell_credential_issuer::refresh::CredentialRefresh;
 use openshell_policy::ProviderPolicyLayer;
 use prost::Message;
-use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use tonic::Status;
 use tracing::warn;
@@ -1727,23 +1726,32 @@ fn derive_workload_credential_handle(
     endpoints.sort();
     endpoints.dedup();
 
-    let mut hasher = Sha256::new();
-    hash_handle_component(&mut hasher, b"openshell-workload-credential-handle-v1");
-    hash_handle_component(&mut hasher, sandbox_id.as_bytes());
-    hash_handle_component(&mut hasher, provider_id.as_bytes());
-    hash_handle_component(&mut hasher, credential_key.as_bytes());
-    hash_handle_component(&mut hasher, authorization_epoch.as_bytes());
+    let mut hasher = openshell_crypto::sha256_digest()
+        .expect("sha256 digest is infallible with a correctly installed backend");
+    hash_handle_component(&mut *hasher, b"openshell-workload-credential-handle-v1");
+    hash_handle_component(&mut *hasher, sandbox_id.as_bytes());
+    hash_handle_component(&mut *hasher, provider_id.as_bytes());
+    hash_handle_component(&mut *hasher, credential_key.as_bytes());
+    hash_handle_component(&mut *hasher, authorization_epoch.as_bytes());
     for (host, port, path) in endpoints {
-        hash_handle_component(&mut hasher, host.as_bytes());
-        hash_handle_component(&mut hasher, &port.to_le_bytes());
-        hash_handle_component(&mut hasher, path.as_bytes());
+        hash_handle_component(&mut *hasher, host.as_bytes());
+        hash_handle_component(&mut *hasher, &port.to_le_bytes());
+        hash_handle_component(&mut *hasher, path.as_bytes());
     }
-    hex::encode(hasher.finalize())
+    hex::encode(
+        hasher
+            .finish()
+            .expect("sha256 digest is infallible with a correctly installed backend"),
+    )
 }
 
-fn hash_handle_component(hasher: &mut Sha256, value: &[u8]) {
-    hasher.update(value.len().to_le_bytes());
-    hasher.update(value);
+fn hash_handle_component(hasher: &mut dyn openshell_crypto::Digest, value: &[u8]) {
+    hasher
+        .update(&value.len().to_le_bytes())
+        .expect("sha256 digest is infallible with a correctly installed backend");
+    hasher
+        .update(value)
+        .expect("sha256 digest is infallible with a correctly installed backend");
 }
 
 /// Resolve dynamic credentials (token grants) from the same records used for

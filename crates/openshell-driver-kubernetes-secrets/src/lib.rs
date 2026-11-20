@@ -19,7 +19,6 @@ use openshell_core::proto::credentials::v1::{
     credential_driver_server::CredentialDriver,
 };
 use openshell_core::{Error, Result as CoreResult};
-use sha2::{Digest, Sha256};
 use tonic::{Request, Response, Status};
 
 const SERVICE_ACCOUNT_NAMESPACE_PATH: &str =
@@ -577,22 +576,40 @@ fn managed_secret(secret_name: &str, key: &str, owner_id: &str, value: &str) -> 
     }
 }
 
+/// Lower-case hex encoding for a digest. `openshell_crypto::sha256_digest`
+/// returns a plain `[u8; 32]`, not a type with its own `LowerHex` impl, so
+/// this replaces the `format!("{:x}", ...)` the RustCrypto `sha2`/`digest`
+/// crates used to provide for free.
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
 fn credential_owner_id(
     workspace: &str,
     provider_id: &str,
     provider_name: &str,
     credential_key: &str,
 ) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(workspace.as_bytes());
-    hasher.update([0]);
-    hasher.update(provider_id.as_bytes());
-    hasher.update([0]);
-    hasher.update(provider_name.as_bytes());
-    hasher.update([0]);
-    hasher.update(credential_key.as_bytes());
-    let digest = hasher.finalize();
-    format!("{digest:x}")
+    let mut hasher = openshell_crypto::sha256_digest()
+        .expect("sha256 is infallible with a correctly installed backend");
+    for part in [
+        workspace.as_bytes(),
+        &[0],
+        provider_id.as_bytes(),
+        &[0],
+        provider_name.as_bytes(),
+        &[0],
+        credential_key.as_bytes(),
+    ] {
+        hasher
+            .update(part)
+            .expect("sha256 is infallible with a correctly installed backend");
+    }
+    hex_encode(
+        &hasher
+            .finish()
+            .expect("sha256 is infallible with a correctly installed backend"),
+    )
 }
 
 fn managed_secret_name(
@@ -604,11 +621,22 @@ fn managed_secret_name(
 ) -> String {
     let mut hex = credential_owner_id(workspace, provider_id, provider_name, credential_key);
     if object_id != provider_id {
-        let mut hasher = Sha256::new();
-        hasher.update(hex.as_bytes());
-        hasher.update([0]);
-        hasher.update(object_id.as_bytes());
-        hex = format!("{:x}", hasher.finalize());
+        let mut hasher = openshell_crypto::sha256_digest()
+            .expect("sha256 is infallible with a correctly installed backend");
+        hasher
+            .update(hex.as_bytes())
+            .expect("sha256 is infallible with a correctly installed backend");
+        hasher
+            .update(&[0])
+            .expect("sha256 is infallible with a correctly installed backend");
+        hasher
+            .update(object_id.as_bytes())
+            .expect("sha256 is infallible with a correctly installed backend");
+        hex = hex_encode(
+            &hasher
+                .finish()
+                .expect("sha256 is infallible with a correctly installed backend"),
+        );
     }
     format!("openshell-cred-{}", &hex[..40])
 }

@@ -12,7 +12,6 @@ use crate::storage_proto::StoredProviderProfile;
 use openshell_core::proto::{Provider, Sandbox};
 use openshell_core::time::timestamp_to_millis;
 use prost::Message;
-use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 /// Read only committed configuration sources, never sandbox `updated_at`.
@@ -134,8 +133,10 @@ pub async fn configuration_change(
     }
     sources.sort();
     let encoded = serde_json::to_vec(&sources).map_err(|e| e.to_string())?;
+    let digest = openshell_crypto::sha256(&encoded)
+        .map_err(|_| "compute configuration change id".to_string())?;
     Ok(ConfigurationChange {
-        id: format!("{:x}", Sha256::digest(encoded)),
+        id: hex::encode(digest),
         committed_at_ms,
     })
 }

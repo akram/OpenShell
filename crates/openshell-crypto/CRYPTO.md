@@ -106,13 +106,8 @@ is migrated or deleted.
 
 | Dependency | Allowed application crates | Classification |
 | --- | --- | --- |
-| `sha2` | `openshell-core` | Endpoint identities and canonical policy hashes; policy binding still requires migration. |
-| `sha2` | `openshell-driver-docker`, `openshell-driver-kubernetes-secrets`, `openshell-driver-vault` | Deterministic volume and credential-storage names, not authentication. |
-| `sha2` | `openshell-driver-kubernetes`, `openshell-driver-podman` | Destination-trust ConfigMap names and operator-bundle generation labels, not authenticity proofs. Trust relies on immutable staging, exact-byte validation, and TLS verification; see the README's destination-trust classification. |
-| `sha2` | `openshell-driver-vm`, `openshell-isolation-interface`, `openshell-supervisor-network` | Artifact integrity, outer-fence evidence, and DNS policy binding; security-sensitive migration remains required. |
-| `sha2` | `openshell-gateway-interceptors` | Provider-profile snapshot revision hashes; content identity outside backend dispatch. |
+| `sha2` | `openshell-driver-vm`, `openshell-supervisor-network` | Artifact integrity and DNS policy binding; security-sensitive migration remains required. The outer-fence evidence digest in `openshell-isolation-interface` that used to share this row migrated to `openshell_crypto::sha256` (RHOAIENG-97009); that crate's `sha2` wrapper exception is removed. |
 | `sha2` | `openshell-supervisor-process` | Diagnostic debug-token fingerprints. |
-| `sha2`, `hmac` | `openshell-server` | Naming, coordination, request matching, and tests, plus security-sensitive bearer-cache keys, launch-session derivation, policy/review bindings, credential handles, and protected mutation fingerprints. The security-sensitive uses must migrate; the HMAC exception is for `grpc::mutation_replay`'s protection against offline guessing. |
 | `rsa` | `openshell-server` | Development dependency for OIDC test keys. Cargo-deny cannot restrict a wrapper exception to development dependencies. |
 | `sha1` | `openshell-supervisor-network` | WebSocket accept-handshake hashing, a protocol requirement rather than cryptographic authentication. |
 

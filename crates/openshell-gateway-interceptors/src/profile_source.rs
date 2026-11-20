@@ -11,7 +11,6 @@ use openshell_core::proto::gateway_interceptor::v1::{
     ProviderProfileSnapshotRequest, gateway_interceptor_client::GatewayInterceptorClient,
 };
 use prost::Message as _;
-use sha2::Digest as _;
 use tonic::Request;
 
 use crate::{ExtensionChannel, InterceptorError, Result};
@@ -96,12 +95,32 @@ fn provider_profile_snapshot_revision(profiles: &[ProviderProfile]) -> String {
         .iter_mut()
         .for_each(normalize_provider_profile_mcp_fields);
     profiles.sort_by(|left, right| left.id.cmp(&right.id));
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(b"openshell-provider-profile-snapshot-v1");
+    let mut hasher = openshell_crypto::sha256_digest()
+        .expect("sha256 is infallible with a correctly installed backend");
+    hasher
+        .update(b"openshell-provider-profile-snapshot-v1")
+        .expect("sha256 is infallible with a correctly installed backend");
     for profile in profiles {
-        hasher.update(profile.encode_to_vec());
+        hasher
+            .update(&profile.encode_to_vec())
+            .expect("sha256 is infallible with a correctly installed backend");
     }
-    format!("sha256:{:x}", hasher.finalize())
+    format!(
+        "sha256:{}",
+        hex_encode(
+            &hasher
+                .finish()
+                .expect("sha256 is infallible with a correctly installed backend")
+        )
+    )
+}
+
+/// Lower-case hex encoding for a digest. `openshell_crypto::sha256_digest`
+/// returns a plain `[u8; 32]`, not a type with its own `LowerHex` impl, so
+/// this replaces the `format!("{:x}", ...)` the RustCrypto `sha2`/`digest`
+/// crates used to provide for free.
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 fn resolve_provider_profile_snapshot_revision(

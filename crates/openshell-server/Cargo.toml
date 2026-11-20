@@ -11,7 +11,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-openshell-crypto = { workspace = true, features = ["tls-kube", "tls-sqlx"] }
+openshell-crypto = { workspace = true, features = ["tls-kube", "tls-sqlx", "spiffe-jwt"] }
 openshell-bootstrap = { path = "../openshell-bootstrap" }
 openshell-core = { path = "../openshell-core", default-features = false, features = ["jwt", "oauth", "otel"] }
 openshell-credential-issuer = { path = "../openshell-credential-issuer" }
@@ -94,8 +94,6 @@ sqlx = { workspace = true }
 sqlx-core = { workspace = true }
 reqwest = { workspace = true }
 uuid = { workspace = true }
-hmac = "0.12"
-sha2 = { workspace = true }
 jsonwebtoken = { workspace = true }
 spiffe = { workspace = true }
 async-trait = "0.1"

@@ -80,7 +80,6 @@ use openshell_supervisor_control::{
     RegistrationTraceContext, SandboxInstanceRegistration, SharedSupervision,
 };
 use serde::Deserialize;
-use sha2::{Digest as _, Sha256};
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
@@ -146,6 +145,14 @@ struct NetworkAdditionalCaConfigMap {
     digest: String,
 }
 
+/// Lower-case hex encoding for a digest. `openshell_crypto::sha256` returns a
+/// plain `[u8; 32]`, not a type with its own `LowerHex` impl, so this
+/// replaces the `format!("{:x}", ...)` the RustCrypto `sha2`/`digest` crates
+/// used to provide for free.
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
 fn network_additional_ca_config_map_name(gateway_id: &str, digest: &str) -> String {
     // Kubernetes labels have a 63-byte limit. Keep recognizable stable
     // prefixes while hashing both variable inputs. The complete digest is
@@ -154,8 +161,14 @@ fn network_additional_ca_config_map_name(gateway_id: &str, digest: &str) -> Stri
     // trust comes from the immutable flag, the digest annotation, and the
     // exact-byte validation. Classified as a non-security identity hash in
     // openshell-crypto/README.md.
-    let gateway_hash = format!("{:x}", Sha256::digest(gateway_id.as_bytes()));
-    let digest_hash = format!("{:x}", Sha256::digest(digest.as_bytes()));
+    let gateway_hash = hex_encode(
+        &openshell_crypto::sha256(gateway_id.as_bytes())
+            .expect("sha256 is infallible with a correctly installed backend"),
+    );
+    let digest_hash = hex_encode(
+        &openshell_crypto::sha256(digest.as_bytes())
+            .expect("sha256 is infallible with a correctly installed backend"),
+    );
     format!(
         "{ADDITIONAL_CA_CONFIG_MAP_PREFIX}{}-{}",
         &gateway_hash[..12],

@@ -503,9 +503,10 @@ impl From<Sha256Digest> for String {
 
 impl Sha256Digest {
     fn compute(bytes: &[u8]) -> Self {
-        use sha2::{Digest as _, Sha256};
-
-        Self(Sha256::digest(bytes).into())
+        Self(
+            openshell_crypto::sha256(bytes)
+                .expect("sha256 is infallible with a correctly installed backend"),
+        )
     }
 
     /// Return the raw digest bytes.

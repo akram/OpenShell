@@ -32,11 +32,18 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use sha2::Digest;
 use tracing::{Instrument as _, debug, info, warn};
 
 const STOP_COMPLETION_POLL_INTERVAL: Duration = Duration::from_millis(50);
 const STOP_COMPLETION_TIMEOUT_HEADROOM: Duration = Duration::from_secs(5);
+
+/// Lower-case hex encoding for a digest. `openshell_crypto::sha256` returns a
+/// plain `[u8; 32]`, not a type with its own `LowerHex` impl, so this
+/// replaces the `format!("{:x}", ...)` the RustCrypto `sha2`/`digest` crates
+/// used to provide for free.
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
 const POLICY_DNS_RESOLV_CONF: &[u8] = b"nameserver 127.0.0.53\n";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -487,7 +494,13 @@ fn operator_network_trust(
     // proof: trust comes from the bounded validation above, the immutable
     // staged artifact, and TLS verification. Classified as a non-security
     // identity hash in openshell-crypto/README.md.
-    let digest = format!("sha256:{:x}", sha2::Sha256::digest(pem.as_bytes()));
+    let digest = format!(
+        "sha256:{}",
+        hex_encode(
+            &openshell_crypto::sha256(pem.as_bytes())
+                .expect("sha256 is infallible with a correctly installed backend")
+        )
+    );
 
     let staging = tempfile::tempdir().map_err(|error| {
         PodmanApiError::InvalidInput(format!("create additional CA staging directory: {error}"))

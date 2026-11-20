@@ -449,13 +449,23 @@ impl Store {
         provider_id: &str,
         credential_key: &str,
     ) -> PersistenceResult<RefreshMutationGuard> {
-        use sha2::{Digest, Sha256};
-        let mut digest = Sha256::new();
-        digest.update(b"openshell-provider-refresh-lock-v1\0");
-        digest.update(provider_id.as_bytes());
-        digest.update(b"\0");
-        digest.update(credential_key.as_bytes());
-        let hash = digest.finalize();
+        let mut digest = openshell_crypto::sha256_digest()
+            .map_err(|e| PersistenceError::Config(e.to_string()))?;
+        digest
+            .update(b"openshell-provider-refresh-lock-v1\0")
+            .map_err(|e| PersistenceError::Config(e.to_string()))?;
+        digest
+            .update(provider_id.as_bytes())
+            .map_err(|e| PersistenceError::Config(e.to_string()))?;
+        digest
+            .update(b"\0")
+            .map_err(|e| PersistenceError::Config(e.to_string()))?;
+        digest
+            .update(credential_key.as_bytes())
+            .map_err(|e| PersistenceError::Config(e.to_string()))?;
+        let hash = digest
+            .finish()
+            .map_err(|e| PersistenceError::Config(e.to_string()))?;
         let key = i64::from_be_bytes(hash[..8].try_into().expect("eight digest bytes"));
         match self {
             Self::Postgres(store) => Ok(RefreshMutationGuard {

@@ -15,7 +15,6 @@ use rustls::pki_types::{
     CertificateDer,
     pem::{PemObject, SectionKind},
 };
-use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
@@ -23,6 +22,8 @@ use std::path::{Path, PathBuf};
 use crate::config_file::SupervisorNetworkFileSection;
 
 pub const CONFIG_FIELD: &str = "openshell.supervisor.network.additional_ca_bundle";
+/// SHA-256 digests are always 32 bytes; this is not backend-dependent.
+const SHA256_DIGEST_HEX_LEN: usize = 32 * 2;
 const ARTIFACT_DIRECTORY: &str = "network-supervisor";
 const ARTIFACT_FILE_PREFIX: &str = "additional-ca-";
 const ARTIFACT_FILE_SUFFIX: &str = ".crt";
@@ -100,7 +101,13 @@ fn normalize_source_path(source_path: &Path) -> Result<NormalizedNetworkSupervis
         // authenticity proof: trust comes from the gateway's normalization,
         // the immutable staged artifact, and TLS verification. Classified as
         // a non-security identity hash in openshell-crypto/README.md.
-        digest: format!("sha256:{:x}", Sha256::digest(&normalized_pem)),
+        digest: format!(
+            "sha256:{}",
+            hex::encode(
+                openshell_crypto::sha256(&normalized_pem)
+                    .map_err(|_| Error::config("failed to hash normalized trust bundle"))?
+            )
+        ),
         normalized_pem,
         certificate_count,
     })
@@ -367,7 +374,7 @@ fn stage_temporary_artifact(artifact_dir: &Path, normalized: &[u8]) -> Result<te
 
 fn artifact_file_name(digest: &str) -> Result<String> {
     let hex = digest.strip_prefix("sha256:").filter(|hex| {
-        hex.len() == Sha256::output_size() * 2 && hex.bytes().all(|byte| byte.is_ascii_hexdigit())
+        hex.len() == SHA256_DIGEST_HEX_LEN && hex.bytes().all(|byte| byte.is_ascii_hexdigit())
     });
     let Some(hex) = hex else {
         return Err(Error::config(
@@ -511,7 +518,10 @@ mod tests {
     }
 
     fn digest_for(contents: &[u8]) -> String {
-        format!("sha256:{:x}", Sha256::digest(contents))
+        format!(
+            "sha256:{}",
+            hex::encode(openshell_crypto::sha256(contents).expect("hash test fixture"))
+        )
     }
 
     fn assert_no_artifact_temporary_names(state_dir: &Path) {
@@ -577,7 +587,7 @@ mod tests {
             .digest()
             .strip_prefix("sha256:")
             .expect("digest prefix");
-        assert_eq!(digest_hex.len(), Sha256::output_size() * 2);
+        assert_eq!(digest_hex.len(), SHA256_DIGEST_HEX_LEN);
         assert_eq!(
             bundle.artifact_path(),
             state_dir

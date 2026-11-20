@@ -15,7 +15,6 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::sync::Arc;
 
-use sha2::{Digest, Sha256};
 use tokio::sync::{mpsc, watch};
 
 use crate::endpoint_failure::EndpointFailure;
@@ -64,19 +63,25 @@ pub fn initial_endpoint_status(
     ports.sort_unstable();
     ports.dedup();
 
-    let mut digest = Sha256::new();
-    digest.update(DOMAIN);
-    hash_identity_value(&mut digest, host.as_bytes());
-    hash_identity_value(&mut digest, path.as_bytes());
+    let mut digest = openshell_crypto::sha256_digest()
+        .expect("sha256 is infallible with a correctly installed backend");
+    digest
+        .update(DOMAIN)
+        .expect("sha256 is infallible with a correctly installed backend");
+    hash_identity_value(digest.as_mut(), host.as_bytes());
+    hash_identity_value(digest.as_mut(), path.as_bytes());
     let port_count = u64::try_from(ports.len()).unwrap_or(u64::MAX);
-    hash_identity_value(&mut digest, &port_count.to_be_bytes());
+    hash_identity_value(digest.as_mut(), &port_count.to_be_bytes());
     for port in &ports {
-        hash_identity_value(&mut digest, &port.to_be_bytes());
+        hash_identity_value(digest.as_mut(), &port.to_be_bytes());
     }
 
     let mut endpoint_id = String::with_capacity("endpoint:v1:".len() + 64);
     endpoint_id.push_str("endpoint:v1:");
-    for byte in digest.finalize() {
+    for byte in digest
+        .finish()
+        .expect("sha256 is infallible with a correctly installed backend")
+    {
         // Writing to a String is infallible; ignore fmt's Result without
         // weakening the identity derivation contract with a panic path.
         let _ = write!(endpoint_id, "{byte:02x}");
@@ -92,10 +97,14 @@ pub fn initial_endpoint_status(
     }
 }
 
-fn hash_identity_value(digest: &mut Sha256, value: &[u8]) {
+fn hash_identity_value(digest: &mut dyn openshell_crypto::Digest, value: &[u8]) {
     let value_len = u64::try_from(value.len()).unwrap_or(u64::MAX);
-    digest.update(value_len.to_be_bytes());
-    digest.update(value);
+    digest
+        .update(&value_len.to_be_bytes())
+        .expect("sha256 is infallible with a correctly installed backend");
+    digest
+        .update(value)
+        .expect("sha256 is infallible with a correctly installed backend");
 }
 
 /// A version of the policy and provider environment installed in a sandbox.
