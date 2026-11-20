@@ -12,7 +12,6 @@ rust-version.workspace = true
 
 [dependencies]
 openshell-sandbox-backend = { path = "../openshell-sandbox-backend" }
-sha2 = { workspace = true }
 openshell-binary-identity = { path = "../openshell-binary-identity" }
 openshell-crypto = { workspace = true, features = ["spiffe-jwt"] }
 openshell-core = { path = "../openshell-core", features = ["oauth"] }

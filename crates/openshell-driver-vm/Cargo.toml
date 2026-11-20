@@ -60,7 +60,6 @@ rustix = { workspace = true, features = ["fs"] }
 libloading = { version = "0.8", optional = true }
 tar = { version = "0.4", optional = true }
 flate2 = { version = "1", optional = true }
-sha2 = { version = "0.10", optional = true }
 zstd = { version = "0.14", optional = true }
 
 [features]
@@ -89,7 +88,6 @@ compute-driver = [
     "dep:polling",
     "dep:prost",
     "dep:prost-types",
-    "dep:sha2",
     "dep:tar",
     "dep:tokio-stream",
     "dep:tonic",
@@ -120,6 +118,10 @@ temp-env = "0.3"
 tempfile = "3"
 rcgen = { workspace = true }
 opentelemetry_sdk = { workspace = true, features = ["testing"] }
+# Only test-only registry_cache_tests.rs still needs this directly (Sha512,
+# which openshell-crypto's facade doesn't cover); everything shipped uses
+# openshell_crypto::sha256/sha256_digest instead. See RHOAIENG-97009.
+sha2 = { version = "0.11" }
 
 # smol-rs/polling drives the BSD/macOS parent-death detection in
 # procguard via kqueue's EVFILT_PROC / NOTE_EXIT filter. We could use

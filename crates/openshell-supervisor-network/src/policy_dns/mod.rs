@@ -41,7 +41,6 @@ use openshell_ocsf::{
     ActionId, ActivityId, ConfigStateChangeBuilder, DispositionId, Endpoint,
     NetworkActivityBuilder, SeverityId, StateId, StatusId,
 };
-use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -413,12 +412,12 @@ fn allocation_identity(endpoints: &[EligibleEndpoint]) -> [u8; 32] {
         })
         .collect::<Vec<_>>();
     contracts.sort();
-    let mut hasher = Sha256::new();
+    let mut hasher = openshell_crypto::sha256_digest().expect("sha256 digest is infallible with a correctly installed backend");
     for contract in contracts {
-        hasher.update(contract.as_bytes());
-        hasher.update([0xff]);
+        hasher.update(contract.as_bytes()).expect("sha256 digest is infallible with a correctly installed backend");
+        hasher.update(&[0xff]).expect("sha256 digest is infallible with a correctly installed backend");
     }
-    hasher.finalize().into()
+    hasher.finish().expect("sha256 digest is infallible with a correctly installed backend")
 }
 
 fn eligible_endpoint_context(endpoints: &[EligibleEndpoint]) -> Vec<PolicyEndpointId> {

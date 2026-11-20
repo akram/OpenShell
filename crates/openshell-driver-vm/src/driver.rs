@@ -83,7 +83,6 @@ use openshell_sandbox_backend::boundary_protocol::{
 use openshell_vfio::SysfsRoot;
 use opentelemetry::trace::TraceContextExt as _;
 use prost::Message;
-use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 use std::fs;
@@ -700,7 +699,10 @@ fn initialize_additional_ca_snapshot(config: &mut VmDriverConfig) -> Result<(), 
             // staged-artifact drift; trust comes from the gateway's
             // normalization and TLS verification. Classified as a non-security
             // identity hash in openshell-crypto/README.md.
-            let actual_digest = format!("sha256:{:x}", Sha256::digest(&pem));
+            let actual_digest = format!(
+                "sha256:{}",
+                hex_encode(&openshell_crypto::sha256(&pem).map_err(|error| error.to_string())?)
+            );
             if actual_digest != expected_digest {
                 return Err(format!(
                     "additional CA artifact '{}' does not match expected digest {}",
@@ -6510,7 +6512,7 @@ fn verify_descriptor_digest(path: &Path, expected_digest: &str) -> Result<(), St
 
 fn compute_file_sha256_hex(path: &Path) -> Result<String, String> {
     let mut file = fs::File::open(path).map_err(|err| format!("open {}: {err}", path.display()))?;
-    let mut hasher = Sha256::new();
+    let mut hasher = openshell_crypto::sha256_digest().map_err(|error| error.to_string())?;
     let mut buffer = vec![0_u8; 64 * 1024].into_boxed_slice();
     loop {
         let read = file
@@ -6519,15 +6521,27 @@ fn compute_file_sha256_hex(path: &Path) -> Result<String, String> {
         if read == 0 {
             break;
         }
-        hasher.update(&buffer[..read]);
+        hasher
+            .update(&buffer[..read])
+            .map_err(|error| error.to_string())?;
     }
-    Ok(format!("{:x}", hasher.finalize()))
+    Ok(hex_encode(&hasher.finish().map_err(|error| error.to_string())?))
 }
 
 fn compute_bytes_sha256_hex(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    format!("{:x}", hasher.finalize())
+    hex_encode(
+        &openshell_crypto::sha256(bytes)
+            .expect("sha256 digest is infallible with a correctly installed backend"),
+    )
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
 }
 
 /// Stage the caller-supplied rootfs archive at `src` into the image cache at
@@ -6574,26 +6588,34 @@ fn stage_rootfs_tar_archive(src: &Path, dst: &Path, max_bytes: u64) -> Result<St
 /// Reader adapter that digests every byte it yields.
 struct HashingReader<R> {
     inner: R,
-    hasher: Sha256,
+    hasher: Box<dyn openshell_crypto::Digest>,
 }
 
 impl<R: Read> HashingReader<R> {
     fn new(inner: R) -> Self {
         Self {
             inner,
-            hasher: Sha256::new(),
+            hasher: openshell_crypto::sha256_digest()
+                .expect("sha256 digest is infallible with a correctly installed backend"),
         }
     }
 
     fn finish(self) -> String {
-        format!("{:x}", self.hasher.finalize())
+        hex_encode(
+            &self
+                .hasher
+                .finish()
+                .expect("sha256 digest is infallible with a correctly installed backend"),
+        )
     }
 }
 
 impl<R: Read> Read for HashingReader<R> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let read = self.inner.read(buf)?;
-        self.hasher.update(&buf[..read]);
+        self.hasher
+            .update(&buf[..read])
+            .map_err(std::io::Error::other)?;
         Ok(read)
     }
 }
@@ -8464,7 +8486,13 @@ mod tests {
         VmDriverConfig {
             grpc_endpoint: "http://127.0.0.1:8080".to_string(),
             additional_ca_bundle: Some(path),
-            additional_ca_digest: Some(format!("sha256:{:x}", Sha256::digest(pem))),
+            additional_ca_digest: Some(format!(
+                "sha256:{}",
+                hex_encode(
+                    &openshell_crypto::sha256(pem)
+                        .expect("sha256 digest is infallible with a correctly installed backend")
+                )
+            )),
             additional_ca_certificate_count: Some(certificate_count),
             ..Default::default()
         }

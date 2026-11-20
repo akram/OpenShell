@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use flate2::read::MultiGzDecoder;
-use sha2::{Digest, Sha256};
 use std::fs;
 use std::fs::File;
 #[cfg(test)]
@@ -41,12 +40,24 @@ pub const fn sandbox_guest_init_path() -> &'static str {
 /// Including this in the image-cache key makes local, uncommitted guest-sandbox
 /// changes invalidate the cache even when the `OpenShell` version is unchanged.
 pub fn sandbox_guest_runtime_identity() -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(SANDBOX);
-    hasher.update(VM_INIT);
-    hasher.update(UMOCI);
-    hasher.update(include_bytes!("../scripts/openshell-vm-sandbox-init.sh"));
-    format!("{:x}", hasher.finalize())
+    let infallible = "sha256 digest is infallible with a correctly installed backend";
+    let mut hasher = openshell_crypto::sha256_digest().expect(infallible);
+    hasher.update(SANDBOX).expect(infallible);
+    hasher.update(VM_INIT).expect(infallible);
+    hasher.update(UMOCI).expect(infallible);
+    hasher
+        .update(include_bytes!("../scripts/openshell-vm-sandbox-init.sh"))
+        .expect(infallible);
+    hex_encode(&hasher.finish().expect(infallible))
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
 }
 
 /// Materialize the supervisor embedded in the VM driver for host-side use.
@@ -112,20 +123,23 @@ fn embedded_host_supervisor_digest() -> Result<[u8; 32], String> {
 }
 
 fn sha256_bytes(bytes: &[u8]) -> [u8; 32] {
-    Sha256::digest(bytes).into()
+    openshell_crypto::sha256(bytes)
+        .expect("sha256 digest is infallible with a correctly installed backend")
 }
 
 fn sha256_reader(mut reader: impl Read) -> std::io::Result<[u8; 32]> {
-    let mut hasher = Sha256::new();
+    let mut hasher = openshell_crypto::sha256_digest().map_err(std::io::Error::other)?;
     let mut buffer = [0_u8; 16 * 1024];
     loop {
         let read = reader.read(&mut buffer)?;
         if read == 0 {
             break;
         }
-        hasher.update(&buffer[..read]);
+        hasher
+            .update(&buffer[..read])
+            .map_err(std::io::Error::other)?;
     }
-    Ok(hasher.finalize().into())
+    hasher.finish().map_err(std::io::Error::other)
 }
 
 fn install_host_supervisor_atomically(path: &Path, bytes: &[u8]) -> Result<(), String> {

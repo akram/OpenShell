@@ -4,6 +4,7 @@
 use super::*;
 use oci_client::client::ClientProtocol;
 use oci_client::manifest::OCI_IMAGE_INDEX_MEDIA_TYPE;
+use sha2::{Digest, Sha256};
 use tokio::io::AsyncReadExt as _;
 
 /// A loopback registry with independent HEAD identity and GET contents. Blob
@@ -104,7 +105,16 @@ fn client() -> OciClient {
 }
 
 fn sha256(body: &[u8]) -> String {
-    format!("sha256:{:x}", Sha256::digest(body))
+    format!("sha256:{}", hex_bytes(&Sha256::digest(body)))
+}
+
+fn hex_bytes(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
 }
 
 fn manifest(label: &str) -> Vec<u8> {
@@ -280,7 +290,7 @@ async fn accepts_sha512_pin(bootstrap: bool) {
         } else {
             trusted.clone()
         };
-        let digest = format!("sha512:{:x}", sha2::Sha512::digest(&top));
+        let digest = format!("sha512:{}", hex_bytes(&sha2::Sha512::digest(&top)));
         // Canonical SHA-256 response headers are valid for a SHA-512 request.
         // The complete pin must still be checked, including for an index.
         let registry = Registry::start(
@@ -440,7 +450,7 @@ async fn registry_cache_preserves_caller_digest_when_head_uses_another_algorithm
     let trusted = manifest("trusted");
     let digest = sha256(&trusted);
     let registry = Registry::start(
-        format!("sha512:{:x}", sha2::Sha512::digest(b"replacement")),
+        format!("sha512:{}", hex_bytes(&sha2::Sha512::digest(b"replacement"))),
         HashMap::new(),
         None,
         false,
