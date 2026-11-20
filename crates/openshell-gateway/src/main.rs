@@ -22,6 +22,13 @@ fn install_crypto_backend() -> miette::Result<()> {
 #[tokio::main]
 async fn main() -> miette::Result<()> {
     install_crypto_backend()?;
+    // Same reasoning as `install_crypto_backend`, for jsonwebtoken's own
+    // process-wide `CryptoProvider`: without this, it lazily falls back to
+    // whichever backend jsonwebtoken's own Cargo features select on first
+    // use. Dependencies such as spiffe call `jsonwebtoken::decode` directly
+    // and may run before this binary's own JWT code would otherwise trigger
+    // that lazy install.
+    openshell_crypto::install_jwt_provider();
     openshell_server::cli::run_cli_with_compute_drivers(
         openshell_gateway::install_default_compute_drivers(),
     )
