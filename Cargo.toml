@@ -208,6 +208,10 @@ opt-level = 3
 [patch.crates-io]
 russh = { git = "https://github.com/akram/russh", branch = "feat/optional-openssl-gcm-backend" }
 ssh-key = { git = "https://github.com/akram/rust-ssh-key", branch = "feat/openssl-pkcs8-and-keygen" }
+# ssh-key depends on ssh-cipher as a plain crates.io version requirement (no
+# in-repo `path`, even though both live in the same rust-ssh-key workspace),
+# so it needs its own patch entry to pick up the same fork/branch.
+ssh-cipher = { git = "https://github.com/akram/rust-ssh-key", branch = "feat/openssl-pkcs8-and-keygen" }
 # Adds `jwt-verify-openssl`: no jsonwebtoken crypto backend compiled in, so
 # aws-lc-rs is not pulled in just for spiffe's JWT-SVID verification. The
 # embedder (openshell-gateway) installs its own OpenSSL-backed
