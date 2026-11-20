@@ -14,12 +14,13 @@ repository.workspace = true
 # Only this feature selects the default backend. With defaults disabled an
 # embedder must install its backend before any crypto operation.
 default = ["aws-lc"]
-aws-lc = ["dep:aws-lc-rs", "rustls/aws_lc_rs", "rcgen/aws_lc_rs", "jsonwebtoken/aws_lc_rs", "tonic?/tls-aws-lc", "kube?/aws-lc-rs", "kube?/rustls-tls", "sqlx?/tls-rustls-aws-lc-rs", "reqwest?/rustls-tls-native-roots-no-provider", "spiffe?/jwt-verify-aws-lc-rs"]
+aws-lc = ["dep:aws-lc-rs", "rustls/aws_lc_rs", "rcgen/aws_lc_rs", "jsonwebtoken/aws_lc_rs", "tonic?/tls-aws-lc", "kube?/aws-lc-rs", "kube?/rustls-tls", "sqlx?/tls-rustls-aws-lc-rs", "reqwest?/rustls-tls-native-roots-no-provider", "sqlx?/md5-rust-crypto", "spiffe?/jwt-verify-aws-lc-rs"]
 # Makes OpenSsl available for explicit context selection; does not change defaults.
 # Also routes the dependency-owned TLS/JWT clients that have an OpenSSL-linked
 # build upstream (kube-client, reqwest, spiffe) through it instead of their
-# rustls/aws-lc-rs defaults.
-openssl = ["dep:openssl", "dep:rustls-openssl", "dep:jsonwebtoken-openssl", "dep:zeroize", "kube?/openssl-tls", "reqwest?/native-tls", "spiffe?/jwt-verify-openssl"]
+# rustls/aws-lc-rs defaults, and sqlx-postgres's legacy md5 password
+# authentication (fork; see RHOAIENG-97009).
+openssl = ["dep:openssl", "dep:rustls-openssl", "dep:jsonwebtoken-openssl", "dep:zeroize", "kube?/openssl-tls", "reqwest?/native-tls", "spiffe?/jwt-verify-openssl", "sqlx?/openssl"]
 tls-tonic = ["dep:tonic"]
 tls-kube = ["dep:kube", "dep:k8s-openapi"]
 tls-sqlx = ["dep:sqlx"]

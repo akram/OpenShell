@@ -2032,7 +2032,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2832,6 +2832,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyper-openssl"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "527d4d619ca2c2aafa31ec139a3d1d60bf557bf7578a1f20f743637eccd9ca19"
+dependencies = [
+ "http 1.4.0",
+ "hyper",
+ "hyper-util",
+ "linked_hash_set",
+ "once_cell",
+ "openssl",
+ "openssl-sys",
+ "parking_lot",
+ "pin-project",
+ "tower-layer",
+ "tower-service",
+]
+
+[[package]]
 name = "hyper-rustls"
 version = "0.27.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2859,6 +2878,22 @@ dependencies = [
  "hyper-util",
  "pin-project-lite",
  "tokio",
+ "tower-service",
+]
+
+[[package]]
+name = "hyper-tls"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70206fc6890eaca9fde8a0bf71caa2ddfc9fe045ac9e5c70df101a7dbde866e0"
+dependencies = [
+ "bytes",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "native-tls",
+ "tokio",
+ "tokio-native-tls",
  "tower-service",
 ]
 
@@ -3517,12 +3552,14 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-http-proxy",
+ "hyper-openssl",
  "hyper-rustls",
  "hyper-timeout",
  "hyper-util",
  "jsonpath-rust",
  "k8s-openapi",
  "kube-core",
+ "openssl",
  "pem 3.0.6",
  "rustls",
  "secrecy",
@@ -3687,6 +3724,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e752191d037c44ad111a8caa762921926658402f01cc1253f7bef2020ece4f5e"
 dependencies = [
  "bitflags 2.13.2",
+]
+
+[[package]]
+name = "linked-hash-map"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
+
+[[package]]
+name = "linked_hash_set"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "984fb35d06508d1e69fc91050cceba9c0b748f983e6739fa2c7a9237154c52c8"
+dependencies = [
+ "linked-hash-map",
 ]
 
 [[package]]
@@ -3971,6 +4023,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
 
 [[package]]
+name = "native-tls"
+version = "0.2.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "465500e14ea162429d264d44189adc38b199b62b1c21eea9f69e4b73cb03bbf2"
+dependencies = [
+ "libc",
+ "log",
+ "openssl",
+ "openssl-probe",
+ "openssl-sys",
+ "schannel",
+ "security-framework",
+ "security-framework-sys",
+ "tempfile",
+]
+
+[[package]]
 name = "nix"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4066,7 +4135,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -4442,7 +4511,6 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
- "sha2 0.10.9",
  "tar",
  "tempfile",
  "thiserror 2.0.20",
@@ -4502,10 +4570,12 @@ dependencies = [
  "openssl",
  "pem 3.0.6",
  "rcgen",
+ "reqwest 0.12.28",
  "rustls",
  "rustls-openssl",
  "serde",
  "serde_json",
+ "spiffe",
  "sqlx",
  "thiserror 2.0.20",
  "tonic",
@@ -4554,7 +4624,6 @@ dependencies = [
  "rustix 1.1.6",
  "serde",
  "serde_json",
- "sha2 0.10.9",
  "tar",
  "temp-env",
  "tempfile",
@@ -4602,7 +4671,6 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
- "sha2 0.10.9",
  "temp-env",
  "thiserror 2.0.20",
  "tokio",
@@ -4627,7 +4695,6 @@ dependencies = [
  "openshell-core",
  "openshell-crypto",
  "serde",
- "sha2 0.10.9",
  "tokio",
  "toml",
  "tonic",
@@ -4684,7 +4751,6 @@ dependencies = [
  "rustix 1.1.6",
  "serde",
  "serde_json",
- "sha2 0.10.9",
  "tar",
  "temp-env",
  "tempfile",
@@ -4714,7 +4780,6 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
- "sha2 0.10.9",
  "tempfile",
  "tokio",
  "tokio-rustls",
@@ -4828,12 +4893,12 @@ dependencies = [
  "json-patch 1.4.0",
  "metrics",
  "openshell-core",
+ "openshell-crypto",
  "openshell-extension-core",
  "prost",
  "prost-reflect",
  "prost-types",
  "serde_json",
- "sha2 0.10.9",
  "thiserror 2.0.20",
  "tokio",
  "tonic",
@@ -4846,9 +4911,9 @@ name = "openshell-isolation-interface"
 version = "0.0.0"
 dependencies = [
  "openshell-core",
+ "openshell-crypto",
  "serde",
  "serde_json",
- "sha2 0.10.9",
  "tokio",
 ]
 
@@ -5123,7 +5188,6 @@ dependencies = [
  "futures-util",
  "glob",
  "hex",
- "hmac 0.12.1",
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
@@ -5175,11 +5239,10 @@ dependencies = [
  "rustls-pki-types",
  "serde",
  "serde_json",
- "sha2 0.10.9",
  "socket2",
  "spiffe",
  "sqlx",
- "sqlx-core",
+ "sqlx-core 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
@@ -5643,7 +5706,7 @@ dependencies = [
 [[package]]
 name = "pageant"
 version = "0.2.5"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#9279548210c29b3af17b4e4546373fe9e5adf352"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#e4f524ecc8add866d08c788546b7cf21cc5dfce3"
 dependencies = [
  "base16ct",
  "byteorder",
@@ -6377,7 +6440,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -6733,9 +6796,11 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-rustls",
+ "hyper-tls",
  "hyper-util",
  "js-sys",
  "log",
+ "native-tls",
  "percent-encoding",
  "pin-project-lite",
  "quinn",
@@ -6747,6 +6812,7 @@ dependencies = [
  "serde_urlencoded",
  "sync_wrapper",
  "tokio",
+ "tokio-native-tls",
  "tokio-rustls",
  "tower",
  "tower-http",
@@ -6879,7 +6945,7 @@ dependencies = [
 [[package]]
 name = "russh"
 version = "0.65.2"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#9279548210c29b3af17b4e4546373fe9e5adf352"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#e4f524ecc8add866d08c788546b7cf21cc5dfce3"
 dependencies = [
  "aes",
  "aws-lc-rs",
@@ -6950,7 +7016,7 @@ dependencies = [
 [[package]]
 name = "russh-cryptovec"
 version = "0.62.0"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#9279548210c29b3af17b4e4546373fe9e5adf352"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#e4f524ecc8add866d08c788546b7cf21cc5dfce3"
 dependencies = [
  "log",
  "nix 0.31.3",
@@ -6981,7 +7047,7 @@ dependencies = [
 [[package]]
 name = "russh-util"
 version = "0.52.0"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#9279548210c29b3af17b4e4546373fe9e5adf352"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#e4f524ecc8add866d08c788546b7cf21cc5dfce3"
 dependencies = [
  "chrono",
  "tokio",
@@ -7048,7 +7114,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -7121,7 +7187,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -7643,8 +7709,7 @@ dependencies = [
 [[package]]
 name = "spiffe"
 version = "0.15.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d3f9e45e9e53f03cb452fe0f050101a9280ff4f4214e326037bc8275284d906"
+source = "git+https://github.com/akram/rust-spiffe?branch=feat%2Fjwt-verify-openssl#c52a69f6348057c1418f60e616830b6842ce8f0d"
 dependencies = [
  "arc-swap",
  "base64ct",
@@ -7707,10 +7772,9 @@ checksum = "3a0219bd7d979d58245a4f41f695e1ac9f8befdffadd7f61f1bae9e39abc6620"
 [[package]]
 name = "sqlx"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "378620ccc25c62c89d8be1c819e76a88d59bdcc3304733330788948e619bfd71"
+source = "git+https://github.com/akram/sqlx?branch=feat%2Fopenssl-md5-password#b8fa4e21c86162cf13f2e0e86beb94a3411ac626"
 dependencies = [
- "sqlx-core",
+ "sqlx-core 0.9.0 (git+https://github.com/akram/sqlx?branch=feat%2Fopenssl-md5-password)",
  "sqlx-macros",
  "sqlx-mysql",
  "sqlx-postgres",
@@ -7722,6 +7786,34 @@ name = "sqlx-core"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05b44e85bf579a8eeb4ceaa77a3a523baf2bf0e9bac7e40f405d537b5d2d5ccb"
+dependencies = [
+ "base64 0.22.1",
+ "bytes",
+ "cfg-if",
+ "crossbeam-queue",
+ "either",
+ "event-listener",
+ "futures-core",
+ "futures-intrusive",
+ "futures-io",
+ "futures-util",
+ "hashbrown 0.16.1",
+ "hashlink",
+ "indexmap",
+ "log",
+ "memchr",
+ "percent-encoding",
+ "rustls-native-certs",
+ "smallvec",
+ "thiserror 2.0.20",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "sqlx-core"
+version = "0.9.0"
+source = "git+https://github.com/akram/sqlx?branch=feat%2Fopenssl-md5-password#b8fa4e21c86162cf13f2e0e86beb94a3411ac626"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -7741,7 +7833,6 @@ dependencies = [
  "memchr",
  "percent-encoding",
  "rustls",
- "rustls-native-certs",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -7757,12 +7848,11 @@ dependencies = [
 [[package]]
 name = "sqlx-macros"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd2b84f2bc39a5705ef27ec785a11c934a41bbd4a24941e257927cddc26b60bf"
+source = "git+https://github.com/akram/sqlx?branch=feat%2Fopenssl-md5-password#b8fa4e21c86162cf13f2e0e86beb94a3411ac626"
 dependencies = [
  "proc-macro2",
  "quote",
- "sqlx-core",
+ "sqlx-core 0.9.0 (git+https://github.com/akram/sqlx?branch=feat%2Fopenssl-md5-password)",
  "sqlx-macros-core",
  "syn 2.0.117",
 ]
@@ -7770,8 +7860,7 @@ dependencies = [
 [[package]]
 name = "sqlx-macros-core"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb8d96de5fdc85a5c4ec813432b523ec637e80ba98f046555f75f7908ddac7c3"
+source = "git+https://github.com/akram/sqlx?branch=feat%2Fopenssl-md5-password#b8fa4e21c86162cf13f2e0e86beb94a3411ac626"
 dependencies = [
  "cfg-if",
  "dotenvy",
@@ -7783,7 +7872,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "sqlx-core",
+ "sqlx-core 0.9.0 (git+https://github.com/akram/sqlx?branch=feat%2Fopenssl-md5-password)",
  "sqlx-postgres",
  "sqlx-sqlite",
  "syn 2.0.117",
@@ -7795,8 +7884,7 @@ dependencies = [
 [[package]]
 name = "sqlx-mysql"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90b8020fe17c5f2c245bfa2505d7ef59c5604839527c740266ad2214acebea27"
+source = "git+https://github.com/akram/sqlx?branch=feat%2Fopenssl-md5-password#b8fa4e21c86162cf13f2e0e86beb94a3411ac626"
 dependencies = [
  "bitflags 2.13.2",
  "byteorder",
@@ -7813,7 +7901,7 @@ dependencies = [
  "serde",
  "sha1 0.11.0",
  "sha2 0.11.0",
- "sqlx-core",
+ "sqlx-core 0.9.0 (git+https://github.com/akram/sqlx?branch=feat%2Fopenssl-md5-password)",
  "thiserror 2.0.20",
  "tracing",
 ]
@@ -7821,8 +7909,7 @@ dependencies = [
 [[package]]
 name = "sqlx-postgres"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87a2bdd6e83f6b3ea525ca9fee568030508b58355a43d0b2c1674d5f79dcd65e"
+source = "git+https://github.com/akram/sqlx?branch=feat%2Fopenssl-md5-password#b8fa4e21c86162cf13f2e0e86beb94a3411ac626"
 dependencies = [
  "atoi",
  "base64 0.22.1",
@@ -7841,12 +7928,13 @@ dependencies = [
  "log",
  "md-5",
  "memchr",
+ "openssl",
  "rand 0.10.2",
  "serde",
  "serde_json",
  "sha2 0.11.0",
  "smallvec",
- "sqlx-core",
+ "sqlx-core 0.9.0 (git+https://github.com/akram/sqlx?branch=feat%2Fopenssl-md5-password)",
  "stringprep",
  "thiserror 2.0.20",
  "tracing",
@@ -7856,8 +7944,7 @@ dependencies = [
 [[package]]
 name = "sqlx-sqlite"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "488e99c397a62007e4229aec669a179816339afc6d2620ca6fa420dbee2e982c"
+source = "git+https://github.com/akram/sqlx?branch=feat%2Fopenssl-md5-password#b8fa4e21c86162cf13f2e0e86beb94a3411ac626"
 dependencies = [
  "atoi",
  "flume",
@@ -7871,7 +7958,7 @@ dependencies = [
  "log",
  "percent-encoding",
  "serde",
- "sqlx-core",
+ "sqlx-core 0.9.0 (git+https://github.com/akram/sqlx?branch=feat%2Fopenssl-md5-password)",
  "thiserror 2.0.20",
  "tracing",
  "url",
@@ -7880,8 +7967,7 @@ dependencies = [
 [[package]]
 name = "ssh-cipher"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d801accda99469cde6d73da741422610fdf6508a72d9a69d1b55cb241c720597"
+source = "git+https://github.com/akram/rust-ssh-key?branch=feat%2Fopenssl-pkcs8-and-keygen#c5d31362ca7741f8208526b558dc42029ae3419c"
 dependencies = [
  "aead",
  "aes",
@@ -7890,6 +7976,7 @@ dependencies = [
  "cipher",
  "ctutils",
  "des",
+ "openssl",
  "poly1305",
  "ssh-encoding",
  "zeroize",
@@ -7913,7 +8000,7 @@ dependencies = [
 [[package]]
 name = "ssh-key"
 version = "0.7.0-rc.12"
-source = "git+https://github.com/akram/rust-ssh-key?branch=feat%2Fopenssl-pkcs8-and-keygen#91af73646f793decde6d090d8c2c4abcd663a354"
+source = "git+https://github.com/akram/rust-ssh-key?branch=feat%2Fopenssl-pkcs8-and-keygen#c5d31362ca7741f8208526b558dc42029ae3419c"
 dependencies = [
  "argon2",
  "bcrypt-pbkdf",
@@ -8120,7 +8207,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.6",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -8169,7 +8256,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230a1b821ccbd75b185820a1f1ff7b14d21da1e442e22c0863ea5f08771a8874"
 dependencies = [
  "rustix 1.1.6",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -8385,6 +8472,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "tokio-native-tls"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbae76ab933c85776efabc971569dd6119c580d8f5d448769dec1764bf796ef2"
+dependencies = [
+ "native-tls",
+ "tokio",
 ]
 
 [[package]]
@@ -9300,7 +9397,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]

@@ -217,3 +217,13 @@ ssh-cipher = { git = "https://github.com/akram/rust-ssh-key", branch = "feat/ope
 # embedder (openshell-gateway) installs its own OpenSSL-backed
 # jsonwebtoken::crypto::CryptoProvider before any JWT op can run.
 spiffe = { git = "https://github.com/akram/rust-spiffe", branch = "feat/jwt-verify-openssl" }
+# Adds `openssl`/`md5-rust-crypto` to sqlx-postgres (unmodified otherwise,
+# based directly on the upstream v0.9.0 tag): the legacy postgres `md5`
+# password-authentication method hardcoded a non-optional RustCrypto md-5
+# dependency with no feature to avoid it. sqlx-postgres and sqlx-core are
+# left unpatched directly: sqlx's own Cargo.toml reaches both via an
+# in-repo `path`, so patching `sqlx` alone is enough, and patching
+# sqlx-postgres on top of that creates a second, separately-resolved
+# instance that doesn't unify features with the one reached through sqlx
+# (silently drops the forwarded openssl/md5-rust-crypto feature).
+sqlx = { git = "https://github.com/akram/sqlx", branch = "feat/openssl-md5-password" }
