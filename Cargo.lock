@@ -5713,7 +5713,7 @@ dependencies = [
 [[package]]
 name = "pageant"
 version = "0.2.5"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#6f2f557a6970e1bb5a458780b9ebfe3ab3c24b60"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#616224f64a3cc20b32fab821a607a1afe3330580"
 dependencies = [
  "base16ct",
  "byteorder",
@@ -6972,7 +6972,7 @@ dependencies = [
 [[package]]
 name = "russh"
 version = "0.65.2"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#6f2f557a6970e1bb5a458780b9ebfe3ab3c24b60"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#616224f64a3cc20b32fab821a607a1afe3330580"
 dependencies = [
  "aes",
  "aws-lc-rs",
@@ -7040,7 +7040,7 @@ dependencies = [
 [[package]]
 name = "russh-cryptovec"
 version = "0.62.0"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#6f2f557a6970e1bb5a458780b9ebfe3ab3c24b60"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#616224f64a3cc20b32fab821a607a1afe3330580"
 dependencies = [
  "log",
  "nix 0.31.3",
@@ -7071,7 +7071,7 @@ dependencies = [
 [[package]]
 name = "russh-util"
 version = "0.52.0"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#6f2f557a6970e1bb5a458780b9ebfe3ab3c24b60"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#616224f64a3cc20b32fab821a607a1afe3330580"
 dependencies = [
  "chrono",
  "tokio",
@@ -7995,7 +7995,7 @@ dependencies = [
 [[package]]
 name = "ssh-cipher"
 version = "0.3.0"
-source = "git+https://github.com/akram/rust-ssh-key?branch=feat%2Fopenssl-pkcs8-and-keygen#55f6cc79eece993e8732dc82380b9bb1840cd171"
+source = "git+https://github.com/akram/rust-ssh-key?branch=feat%2Fopenssl-pkcs8-and-keygen#b53af4a7a3ab6321523fe2073aaf723c6f829f96"
 dependencies = [
  "aead",
  "aes",
@@ -8028,11 +8028,12 @@ dependencies = [
 [[package]]
 name = "ssh-key"
 version = "0.7.0-rc.12"
-source = "git+https://github.com/akram/rust-ssh-key?branch=feat%2Fopenssl-pkcs8-and-keygen#55f6cc79eece993e8732dc82380b9bb1840cd171"
+source = "git+https://github.com/akram/rust-ssh-key?branch=feat%2Fopenssl-pkcs8-and-keygen#b53af4a7a3ab6321523fe2073aaf723c6f829f96"
 dependencies = [
  "argon2",
  "bcrypt-pbkdf",
  "ctutils",
+ "digest 0.11.2",
  "ed25519-dalek",
  "hex",
  "hmac",
