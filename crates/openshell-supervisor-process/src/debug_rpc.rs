@@ -22,7 +22,6 @@ use miette::{IntoDiagnostic, Result, WrapErr};
 use openshell_core::proto::{
     GetSandboxConfigRequest, RefreshSandboxTokenRequest, open_shell_client::OpenShellClient,
 };
-use sha2::{Digest, Sha256};
 
 use openshell_core::grpc_client::{
     AuthedChannel, GatewayCredentials, GatewayEndpoint, connect_channel_pub,
@@ -189,7 +188,8 @@ fn print_token_summary(token: &str, expires_at_ms: Option<i64>) {
 }
 
 fn token_fingerprint(token: &str) -> String {
-    let digest = Sha256::digest(token.as_bytes());
+    let digest = openshell_crypto::sha256(token.as_bytes())
+        .expect("sha256 is infallible with a correctly installed backend");
     format!("sha256:{}", &hex::encode(digest)[..16])
 }
 

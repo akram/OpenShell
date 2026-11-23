@@ -11,6 +11,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+openshell-crypto = { path = "../openshell-crypto" }
 openshell-sandbox-backend = { path = "../openshell-sandbox-backend" }
 openshell-core = { path = "../openshell-core", features = ["jwt"] }
 openshell-isolation-interface = { path = "../openshell-isolation-interface" }
@@ -25,7 +26,6 @@ miette = { workspace = true }
 rand = "0.10"
 russh = "0.65.0"
 serde_json = { workspace = true }
-sha2 = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true, features = ["channel", "tls-native-roots"] }
