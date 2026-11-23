@@ -111,13 +111,16 @@ aws-config = { version = "1", default-features = false, features = ["default-htt
 aws-sdk-sts = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio", "behavior-version-latest"] }
 
 # WebSocket
-tokio-tungstenite = { version = "0.26", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
+# Bumped from 0.26 to match the version axum resolves to (its own
+# `tokio-tungstenite` dependency, see the [patch.crates-io] entries
+# below): unifying on one tungstenite instance everywhere is what
+# resolves cargo-fips-check's bare-name sha1 ambiguity (RHOAIENG-97009).
+tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
 
 # Clipboard (OSC 52)
 base64 = "0.22"
 
 # Crypto / Auth
-sha2 = "0.10"
 rand = "0.9"
 jsonwebtoken = { version = "10", default-features = false, features = ["use_pem"] }
 zeroize = { version = "1", features = ["derive"] }
@@ -242,3 +245,17 @@ axum = { git = "https://github.com/akram/axum", branch = "feat/openssl-ws-accept
 # mlkem768x25519-sha256 hybrid KEX): routes them through OpenSSL instead
 # of the RustCrypto sha3/shake crates, which had no feature to avoid them.
 ml-kem = { git = "https://github.com/akram/KEMs", branch = "feat/openssl-sha3-shake" }
+# Bumps sha1 from upstream's own 0.10 pin to the 0.11 generation used
+# throughout the other forks above (RHOAIENG-97009): axum's own
+# `ws-rust-crypto` sha1 (bumped alongside this one, same reasoning) and
+# tungstenite's own internal handshake sha1 (this one, reached both
+# through axum's tokio-tungstenite dependency and OpenShell's own direct
+# one, bumped to 0.29 above to unify on a single tungstenite instance).
+tungstenite = { git = "https://github.com/akram/tungstenite-rs", branch = "feat/openssl-sha1-unify" }
+# Bumps sha1 from upstream's own 0.10 pin to 0.11 (RHOAIENG-97009): `headers`
+# (reached transitively via kube-client -> hyper-http-proxy, for the
+# Kubernetes compute driver's HTTP-proxy support) hardcodes the same
+# `Sec-WebSocket-Accept` sha1 computation as axum/tungstenite above, with
+# no feature to avoid it. This was the final remaining sha1 0.10 source
+# once axum/tungstenite/russh/ssh-key were all unified on 0.11.
+headers = { git = "https://github.com/akram/headers", branch = "feat/openssl-sha1-unify" }
