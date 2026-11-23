@@ -43,7 +43,6 @@ use openshell_core::secrets::{
     rewrite_http_header_block,
 };
 use openshell_ocsf::ctx::ctx as ocsf_ctx;
-use sha1::{Digest, Sha1};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Write as _};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -2826,10 +2825,12 @@ fn parse_websocket_upgrade_request(raw_header: &[u8]) -> Result<Option<WebSocket
 
 fn websocket_accept_for_key(sec_key: &str) -> String {
     const WEBSOCKET_GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-    let mut hasher = Sha1::new();
-    hasher.update(sec_key.as_bytes());
-    hasher.update(WEBSOCKET_GUID.as_bytes());
-    base64::engine::general_purpose::STANDARD.encode(hasher.finalize())
+    let mut input = Vec::with_capacity(sec_key.len() + WEBSOCKET_GUID.len());
+    input.extend_from_slice(sec_key.as_bytes());
+    input.extend_from_slice(WEBSOCKET_GUID.as_bytes());
+    let digest = openshell_crypto::sha1(&input)
+        .expect("sha1 is infallible with a correctly installed backend");
+    base64::engine::general_purpose::STANDARD.encode(digest)
 }
 
 fn header_value_contains_token(value: &str, expected: &str) -> bool {
