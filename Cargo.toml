@@ -237,3 +237,8 @@ sqlx = { git = "https://github.com/akram/sqlx", branch = "feat/openssl-md5-passw
 # own default features pulled in a second, separate sha1 (via its own
 # `handshake` feature) that axum's shipped code never actually needs.
 axum = { git = "https://github.com/akram/axum", branch = "feat/openssl-ws-accept" }
+# Adds `openssl`/`sha3-rust-crypto` to ml-kem's G/H/J/PRF/XOF (FIPS 203's
+# own SHA3-512/256/SHAKE256/SHAKE128 auxiliary functions, used by russh's
+# mlkem768x25519-sha256 hybrid KEX): routes them through OpenSSL instead
+# of the RustCrypto sha3/shake crates, which had no feature to avoid them.
+ml-kem = { git = "https://github.com/akram/KEMs", branch = "feat/openssl-sha3-shake" }
