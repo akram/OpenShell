@@ -128,7 +128,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -139,7 +139,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -688,8 +688,7 @@ dependencies = [
 [[package]]
 name = "axum"
 version = "0.8.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31b698c5f9a010f6573133b09e0de5408834d0c82f8d7475a89fc1867a71cd90"
+source = "git+https://github.com/akram/axum?branch=feat%2Fopenssl-ws-accept#dc1a9c09dd1f9e4629b7b889ac5aff4a80aa5b33"
 dependencies = [
  "axum-core",
  "base64 0.22.1",
@@ -705,6 +704,7 @@ dependencies = [
  "matchit",
  "memchr",
  "mime",
+ "openssl",
  "percent-encoding",
  "pin-project-lite",
  "serde_core",
@@ -723,9 +723,8 @@ dependencies = [
 
 [[package]]
 name = "axum-core"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08c78f31d7b1291f7ee735c1c6780ccde7785daae9a9206026862dab7d8792d1"
+version = "0.5.5"
+source = "git+https://github.com/akram/axum?branch=feat%2Fopenssl-ws-accept#dc1a9c09dd1f9e4629b7b889ac5aff4a80aa5b33"
 dependencies = [
  "bytes",
  "futures-core",
@@ -2040,7 +2039,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4135,7 +4134,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5714,7 +5713,7 @@ dependencies = [
 [[package]]
 name = "pageant"
 version = "0.2.5"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#8de3d77f93f947ac01e3217b3c633a9dce0696fd"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#cbe2441594b617ee9e2bc9d2a05840863298f73c"
 dependencies = [
  "base16ct",
  "byteorder",
@@ -6468,7 +6467,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6973,7 +6972,7 @@ dependencies = [
 [[package]]
 name = "russh"
 version = "0.65.2"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#8de3d77f93f947ac01e3217b3c633a9dce0696fd"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#cbe2441594b617ee9e2bc9d2a05840863298f73c"
 dependencies = [
  "aes",
  "aws-lc-rs",
@@ -7043,7 +7042,7 @@ dependencies = [
 [[package]]
 name = "russh-cryptovec"
 version = "0.62.0"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#8de3d77f93f947ac01e3217b3c633a9dce0696fd"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#cbe2441594b617ee9e2bc9d2a05840863298f73c"
 dependencies = [
  "log",
  "nix 0.31.3",
@@ -7074,7 +7073,7 @@ dependencies = [
 [[package]]
 name = "russh-util"
 version = "0.52.0"
-source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#8de3d77f93f947ac01e3217b3c633a9dce0696fd"
+source = "git+https://github.com/akram/russh?branch=feat%2Foptional-openssl-gcm-backend#cbe2441594b617ee9e2bc9d2a05840863298f73c"
 dependencies = [
  "chrono",
  "tokio",
@@ -7128,7 +7127,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -7141,7 +7140,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -7214,7 +7213,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -7731,7 +7730,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a766e1110788c36f4fa1c2b71b387a7815aa65f88ce0229841826633d93723e"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -7995,7 +7994,7 @@ dependencies = [
 [[package]]
 name = "ssh-cipher"
 version = "0.3.0"
-source = "git+https://github.com/akram/rust-ssh-key?branch=feat%2Fopenssl-pkcs8-and-keygen#c5d31362ca7741f8208526b558dc42029ae3419c"
+source = "git+https://github.com/akram/rust-ssh-key?branch=feat%2Fopenssl-pkcs8-and-keygen#55f6cc79eece993e8732dc82380b9bb1840cd171"
 dependencies = [
  "aead",
  "aes",
@@ -8028,7 +8027,7 @@ dependencies = [
 [[package]]
 name = "ssh-key"
 version = "0.7.0-rc.12"
-source = "git+https://github.com/akram/rust-ssh-key?branch=feat%2Fopenssl-pkcs8-and-keygen#c5d31362ca7741f8208526b558dc42029ae3419c"
+source = "git+https://github.com/akram/rust-ssh-key?branch=feat%2Fopenssl-pkcs8-and-keygen#55f6cc79eece993e8732dc82380b9bb1840cd171"
 dependencies = [
  "argon2",
  "bcrypt-pbkdf",
@@ -8067,7 +8066,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -8248,7 +8247,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.6",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -8261,7 +8260,7 @@ dependencies = [
  "parking_lot",
  "rustix 1.1.6",
  "signal-hook",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -8297,7 +8296,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230a1b821ccbd75b185820a1f1ff7b14d21da1e442e22c0863ea5f08771a8874"
 dependencies = [
  "rustix 1.1.6",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -8928,12 +8927,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c01152af293afb9c7c2a57e4b559c5620b421f6d133261c60dd2d0cdb38e6b8"
 dependencies = [
  "bytes",
- "data-encoding",
- "http 1.4.0",
- "httparse",
  "log",
  "rand 0.9.4",
- "sha1 0.10.6",
  "thiserror 2.0.20",
 ]
 
@@ -9438,7 +9433,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
