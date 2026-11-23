@@ -103,6 +103,10 @@ pub trait CryptoBackend: Send + Sync {
     /// Compute HMAC-SHA256 over `data` with `key`. One-shot: callers that need
     /// an incremental MAC should hash their own message first.
     fn hmac_sha256(&self, key: &[u8], data: &[u8]) -> Result<[u8; 32], CryptoError>;
+    /// Compute SHA-1 over `data`. Not for security-sensitive use (collision
+    /// resistance is broken) -- only for protocol fields that mandate SHA-1
+    /// non-cryptographically, such as RFC 6455's `Sec-WebSocket-Accept`.
+    fn sha1(&self, data: &[u8]) -> Result<[u8; 20], CryptoError>;
     /// Encrypt with a fresh random 96-bit nonce, appending the 128-bit GCM tag.
     fn seal(
         &self,
@@ -260,6 +264,12 @@ pub fn sha256(bytes: &[u8]) -> Result<[u8; 32], CryptoError> {
 /// Compute HMAC-SHA256 using the selected implementation.
 pub fn hmac_sha256(key: &[u8], data: &[u8]) -> Result<[u8; 32], CryptoError> {
     default_context().backend().hmac_sha256(key, data)
+}
+
+/// Compute SHA-1 using the selected implementation. Not for security-sensitive
+/// use -- see [`CryptoBackend::sha1`].
+pub fn sha1(data: &[u8]) -> Result<[u8; 20], CryptoError> {
+    default_context().backend().sha1(data)
 }
 
 /// Install the JWT adapter if no provider has been installed.
@@ -435,6 +445,9 @@ mod tests {
         }
         fn hmac_sha256(&self, key: &[u8], data: &[u8]) -> Result<[u8; 32], CryptoError> {
             aws_lc::AwsLc.hmac_sha256(key, data)
+        }
+        fn sha1(&self, data: &[u8]) -> Result<[u8; 20], CryptoError> {
+            aws_lc::AwsLc.sha1(data)
         }
         fn seal(&self, _: &[u8; 32], _: &[u8], _: &[u8]) -> Result<aead::Sealed, CryptoError> {
             Err(CryptoError::Random)

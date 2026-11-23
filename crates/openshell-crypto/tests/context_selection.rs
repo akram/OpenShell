@@ -77,6 +77,9 @@ impl CryptoBackend for TestBackend {
     fn hmac_sha256(&self, key: &[u8], data: &[u8]) -> Result<[u8; 32], CryptoError> {
         self.0.backend().hmac_sha256(key, data)
     }
+    fn sha1(&self, data: &[u8]) -> Result<[u8; 20], CryptoError> {
+        self.0.backend().sha1(data)
+    }
     fn seal(&self, _: &[u8; 32], _: &[u8], _: &[u8]) -> Result<Sealed, CryptoError> {
         Err(CryptoError::Random)
     }

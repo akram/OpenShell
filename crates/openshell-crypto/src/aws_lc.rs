@@ -54,6 +54,11 @@ impl CryptoBackend for AwsLc {
         output.copy_from_slice(hmac::sign(&key, data).as_ref());
         Ok(output)
     }
+    fn sha1(&self, data: &[u8]) -> Result<[u8; 20], CryptoError> {
+        let mut output = [0; 20];
+        output.copy_from_slice(digest::digest(&digest::SHA1_FOR_LEGACY_USE_ONLY, data).as_ref());
+        Ok(output)
+    }
     fn seal(
         &self,
         key: &[u8; 32],

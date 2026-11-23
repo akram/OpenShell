@@ -74,6 +74,9 @@ impl CryptoBackend for Backend {
     fn hmac_sha256(&self, _: &[u8], _: &[u8]) -> Result<[u8; 32], CryptoError> {
         Err(CryptoError::Operation)
     }
+    fn sha1(&self, _: &[u8]) -> Result<[u8; 20], CryptoError> {
+        Err(CryptoError::Operation)
+    }
     fn seal(
         &self,
         key: &[u8; 32],

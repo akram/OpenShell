@@ -10,7 +10,7 @@ use crate::{
 use openssl::{
     bn::BigNumContext,
     ec::PointConversionForm,
-    hash::{Hasher, MessageDigest},
+    hash::{hash, Hasher, MessageDigest},
     nid::Nid,
     pkey::{Id, PKey, Private},
     pkey_ctx::PkeyCtx,
@@ -111,6 +111,13 @@ impl CryptoBackend for OpenSsl {
             .sign_to_vec()
             .map_err(|_| CryptoError::Operation)?
             .as_slice()
+            .try_into()
+            .map_err(|_| CryptoError::Operation)
+    }
+    fn sha1(&self, data: &[u8]) -> Result<[u8; 20], CryptoError> {
+        hash(MessageDigest::sha1(), data)
+            .map_err(|_| CryptoError::Operation)?
+            .as_ref()
             .try_into()
             .map_err(|_| CryptoError::Operation)
     }
@@ -372,6 +379,15 @@ impl ProtocolBackend for OpenSsl {
 mod tests {
     use super::*;
     use crate::pki::SigningKey;
+
+    #[test]
+    fn sha1_matches_aws_lc() {
+        let data = b"the quick brown fox jumps over the lazy dog";
+        assert_eq!(
+            OpenSsl.sha1(data).unwrap(),
+            crate::aws_lc::AwsLc.sha1(data).unwrap()
+        );
+    }
 
     #[test]
     fn hmac_sha256_matches_aws_lc() {
