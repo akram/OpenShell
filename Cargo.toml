@@ -29,7 +29,11 @@ prost-types = "0.14"
 prost-reflect = { version = "0.16.5", features = ["serde"] }
 
 # HTTP server
-axum = { version = "0.8", features = ["ws"] }
+# WebSocket support (`ws`) needs a companion feature picking its
+# Sec-WebSocket-Accept hash implementation (`ws-rust-crypto` vs `openssl`,
+# forwarded per-binary from openshell-server's own crypto-openssl/
+# crypto-aws-lc selection), so it isn't hardcoded here.
+axum = { version = "0.8" }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "request-id"] }
 hyper = { version = "1.6", features = ["full"] }
@@ -227,3 +231,9 @@ spiffe = { git = "https://github.com/akram/rust-spiffe", branch = "feat/jwt-veri
 # instance that doesn't unify features with the one reached through sqlx
 # (silently drops the forwarded openssl/md5-rust-crypto feature).
 sqlx = { git = "https://github.com/akram/sqlx", branch = "feat/openssl-md5-password" }
+# Adds `openssl`/`ws-rust-crypto` to axum's `ws` feature: the WebSocket
+# Sec-WebSocket-Accept handshake hash hardcoded a non-optional RustCrypto
+# sha1 dependency with no feature to avoid it, and `tokio-tungstenite`'s
+# own default features pulled in a second, separate sha1 (via its own
+# `handshake` feature) that axum's shipped code never actually needs.
+axum = { git = "https://github.com/akram/axum", branch = "feat/openssl-ws-accept" }

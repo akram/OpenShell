@@ -127,8 +127,8 @@ prebuilt-z3 = ["openshell-prover/prebuilt-z3"]
 test-support = ["openshell-credential-issuer/test-support"]
 ## Forward the host binary's crypto backend selection to the credential issuer
 ## and to the SSH transport (russh).
-aws-lc = ["openshell-credential-issuer/aws-lc", "russh/aws-lc-rs"]
-openssl = ["openshell-credential-issuer/openssl", "russh/openssl"]
+aws-lc = ["openshell-credential-issuer/aws-lc", "russh/aws-lc-rs", "axum/ws-rust-crypto"]
+openssl = ["openshell-credential-issuer/openssl", "russh/openssl", "axum/openssl"]
 
 [build-dependencies]
 tonic-prost-build = { workspace = true }
